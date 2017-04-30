@@ -13,3 +13,5 @@ er: er.cpp
 	g++ -std=c++11 er.cpp -o er `pkg-config --cflags --libs igraph` 
 el2bin: el2bin.cpp
 	g++ -std=c++11 el2bin.cpp -o el2bin 
+small: smallGraph.cpp
+	g++ smallGraph.cpp -o smg ${CPPFLAGS} -lglpk -lpthread
