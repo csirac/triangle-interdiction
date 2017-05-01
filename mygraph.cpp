@@ -2067,12 +2067,28 @@ namespace mygraph {
 
    };
 
+   uint32_t bitMask = !( 3 << 30 );
+   uint32_t bitS = 1 << 31;
+   uint32_t bitW = 1 << 30;
+   
    class tinyEdge {
       //last 30 bits are target node_id
       //first bit is inS, second bit is inW
       uint32_t target;
 
       node_id getId() {
+	 return target & bitMask;
+      }
+
+      bool inS() {
+	 return (target >> 31);
+      }
+
+      bool inW() {
+	 return (target >> 30) & 1; //
+      }
+
+      bool setS() {
 	 
       }
    };
