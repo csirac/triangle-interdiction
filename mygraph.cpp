@@ -8,6 +8,7 @@
 #include <sstream>
 #include <algorithm>
 #include <map>
+#include <unordered_set>
 #include <thread>
 #include "logger.cpp"
 
@@ -1770,6 +1771,12 @@ namespace mygraph {
       node_id to;
    };
 
+   struct smEdge_hash {
+      node_id operator()(const smEdge& e) const {
+	 return e.from + e.to;
+      }
+   };
+
    bool operator==( const smEdge& lhs, const smEdge& rhs ) {
       //      return (((lhs.from == rhs.from) && (lhs.to == rhs.to)) || ((lhs.from == rhs.to) && (lhs.to == rhs.from)));
       return ( (lhs.from == rhs.from) && (lhs.to == rhs.to) );
@@ -1792,8 +1799,8 @@ namespace mygraph {
       vector< vector< node_id > > adjList;
       unsigned n;
       Logger logg;
-      map< smEdge, smTriangle > S;
-
+      //      map< smEdge, smTriangle > S; 
+      unordered_set< smEdge, smEdge_hash > S;
       bool inS( smEdge& st ) {
 	 return (S.find( st ) != S.end());
       }
@@ -1880,13 +1887,16 @@ namespace mygraph {
 	    
 	 if ( ! (inS( js ) || inS(jt) || inS(st) ) ) {
 	    //triangle is disjoint
-	    smTriangle t1;
-	    t1.n1 = j;
-	    t1.n2 = s;
-	    t1.n3 = t;
-	    S.insert( pair< smEdge, smTriangle >( js, t1 ) );
-	    S.insert( pair< smEdge, smTriangle >( jt, t1 ) );
-	    S.insert( pair< smEdge, smTriangle >( st, t1 ) );
+	    //	    smTriangle t1;
+	    //	    t1.n1 = j;
+	    //	    t1.n2 = s;
+	    //	    t1.n3 = t;
+	    //	    S.insert( pair< smEdge, smTriangle >( js, t1 ) );
+	    //	    S.insert( pair< smEdge, smTriangle >( jt, t1 ) );
+	    //	    S.insert( pair< smEdge, smTriangle >( st, t1 ) );
+	    S.insert( js );
+	    S.insert( jt );
+	    S.insert( st );
 	    return true;
 	 }
 
@@ -1939,6 +1949,341 @@ namespace mygraph {
 		     }
 		  }
 		  A_t.push_back( s );
+	       }
+	    }
+	 }
+	 logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+
+	 return countS;
+      }
+
+      /*
+       * DART-BASE (no triangle listing)
+       */
+      unsigned dart_base_free_smaller() {
+	 //	 vector < vector< node_id > > A( n, vector< node_id >() );
+	 unsigned countS = 0;
+	 
+	 for (node_id s = 0; s < n; ++s ) {
+	    for (size_t j = 0; j < adjList[s].size(); ++j) {
+	       node_id& t = adjList[s][ j ];
+	       if (s < t) {
+		  vector< node_id >& A_s = adjList[s];
+		  vector< node_id >& A_t = adjList[t];
+		  auto it1 = A_s.begin();
+		  auto it2 = A_t.begin();
+		  if (it1 == A_s.end() || it2 == A_t.end() ) {
+		     continue;
+		  }
+		  while (1) {
+		     if (*it1 < *it2) {
+			++it1;
+			if (it1 == A_s.end()) {
+			   break;
+			}
+		     } else {
+			if (*it2 < *it1) {
+			   ++it2;
+			   if (it2 == A_t.end()) {
+			      break;
+			   }
+			} else {
+			   //found a triangle
+			   if (free_triangle( *it1, s, t)) {
+			      countS += 3;
+			      
+			   }
+			   
+			   ++it1; 
+			   ++it2; 
+			   if (it1 == A_s.end() || it2 == A_t.end() )
+			      break;
+			}
+		     }
+		  }
+	       }
+	    }
+	 }
+	 logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+
+	 return countS;
+      }
+
+      void list_triangles() {
+	 vector < vector< node_id > > A( n, vector< node_id >() );
+	 vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
+	 size_t count = 0;
+	 
+	 for (node_id s = 0; s < n; ++s ) {
+	    for (size_t j = 0; j < adjList[s].size(); ++j) {
+	       node_id& t = adjList[s][ j ];
+	       if (s < t) {
+		  vector< node_id >& A_s = A[s];
+		  vector< node_id >& A_t = A[t];
+		  vector< size_t >& I_s = I[s];
+		  vector< size_t >& I_t = I[t];
+		  auto it1 = A_s.begin();
+		  auto it2 = A_t.begin();
+		  if (it1 == A_s.end() || it2 == A_t.end() ) {
+		     A_t.push_back( s );
+		     I_t.push_back( j );
+		     continue;
+		  }
+		  auto it3 = I_s.begin();
+		  auto it4 = I_t.begin();
+		  while (1) {
+		     if (*it1 < *it2) {
+			++it1;
+			++it3;
+			if (it1 == A_s.end()) {
+			   break;
+			}
+		     } else {
+			if (*it2 < *it1) {
+			   ++it2;
+			   ++it4;
+			   if (it2 == A_t.end()) {
+			      break;
+			   }
+			} else {
+			   //found a triangle
+			   //add_triangle( *it1, *it3, *it4, j, s, t);
+			   ++count;
+			   ++it1; ++it3;
+			   ++it2; ++it4;
+			   if (it1 == A_s.end() || it2 == A_t.end() )
+			      break;
+			}
+		     }
+		  }
+		  A_t.push_back( s );
+		  I_t.push_back( j );
+	       }
+	    }
+	 }
+	 logg( INFO, to_string(count) + " triangles found.");
+	       
+      }
+
+   };
+
+   class tinyEdge {
+      //last 30 bits are target node_id
+      //first bit is inS, second bit is inW
+      uint32_t target;
+
+      node_id getId() {
+	 
+      }
+   };
+   
+   class tinyGraph {
+   public:
+      vector< vector< node_id > > adjList;
+      unsigned n;
+      Logger logg;
+      //      map< smEdge, smTriangle > S; 
+      unordered_set< smEdge, smEdge_hash > S;
+      bool inS( smEdge& st ) {
+	 return (S.find( st ) != S.end());
+      }
+      
+      smallGraph() {
+	 n = 0;
+      }
+
+      void init_empty_graph() {
+	 vector< unsigned > emptyList;
+	 adjList.assign(n, emptyList);
+      }
+
+      void add_edge( unsigned from, unsigned to ) {
+	 adjList[ from ].push_back( to );
+	 adjList[ to ].push_back( from );
+      }
+      
+      void read_edge_list_bin( string fname ) {
+	 ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+	 unsigned m; //number of edges in list
+	 unsigned n;
+	 ifile.read( (char*) &n, sizeof( unsigned ) );
+	 ifile.read( (char*) &m, sizeof( unsigned ) );
+	 this->n = n;
+	 init_empty_graph();
+
+
+	 // unsigned* fromto_arr = new unsigned [2 * m];
+	 
+	 // ifile.read( (char *) fromto_arr,  2 * m *sizeof( unsigned ) );
+
+	 // logg(INFO, "File input finished. Constructing graph..." );
+
+	 // for (unsigned i = 0; i < m; ++i) {
+	 //    unsigned from = fromto_arr[ 2 * i ];
+	 //    unsigned to = fromto_arr[ 2 * i + 1 ];
+
+	 //    add_edge( from, to );
+	 // }
+
+	 // delete [] fromto_arr;
+
+	 unsigned from,to;
+	 for (unsigned i = 0; i < m; ++i) {
+	    ifile.read( (char *) &from,  sizeof( unsigned ) );
+	    ifile.read( (char *) &to,  sizeof( unsigned ) );
+
+	    add_edge( from, to );
+	 }
+	 ifile.close();
+	 
+	 logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
+
+	 logg(INFO, "Sorting neighbor ids..." );
+	 for (unsigned i = 0; i < n; ++i) {
+	    sort( adjList[i].begin(), adjList[i].end() );
+	 }
+      }
+
+      bool free_triangle( node_id& j, node_id& s, node_id& t ) {
+	 //know s < t. Need to know relation between other two pairs
+	 smEdge st;
+	 st.from = s;
+	 st.to = t;
+	 smEdge js;
+	 smEdge jt;
+	 if (j < s) {
+	    js.from = j;
+	    js.to = s;
+	    jt.from = j;
+	    jt.to = t;
+	 } else {
+	    js.from = s;
+	    js.to = j;
+	    if (j < t) {
+	       jt.from = j;
+	       jt.to = t;
+	    } else {
+	       jt.from = t;
+	       jt.to = j;
+	    }
+	 }
+	    
+	 if ( ! (inS( js ) || inS(jt) || inS(st) ) ) {
+	    //triangle is disjoint
+	    //	    smTriangle t1;
+	    //	    t1.n1 = j;
+	    //	    t1.n2 = s;
+	    //	    t1.n3 = t;
+	    //	    S.insert( pair< smEdge, smTriangle >( js, t1 ) );
+	    //	    S.insert( pair< smEdge, smTriangle >( jt, t1 ) );
+	    //	    S.insert( pair< smEdge, smTriangle >( st, t1 ) );
+	    S.insert( js );
+	    S.insert( jt );
+	    S.insert( st );
+	    return true;
+	 }
+
+	 return false;
+      }
+      
+      /*
+       * DART-BASE (no triangle listing)
+       */
+      unsigned dart_base_free() {
+	 vector < vector< node_id > > A( n, vector< node_id >() );
+	 unsigned countS = 0;
+	 
+	 for (node_id s = 0; s < n; ++s ) {
+	    for (size_t j = 0; j < adjList[s].size(); ++j) {
+	       node_id& t = adjList[s][ j ];
+	       if (s < t) {
+		  vector< node_id >& A_s = A[s];
+		  vector< node_id >& A_t = A[t];
+		  auto it1 = A_s.begin();
+		  auto it2 = A_t.begin();
+		  if (it1 == A_s.end() || it2 == A_t.end() ) {
+		     A_t.push_back( s );
+		     continue;
+		  }
+		  while (1) {
+		     if (*it1 < *it2) {
+			++it1;
+			if (it1 == A_s.end()) {
+			   break;
+			}
+		     } else {
+			if (*it2 < *it1) {
+			   ++it2;
+			   if (it2 == A_t.end()) {
+			      break;
+			   }
+			} else {
+			   //found a triangle
+			   if (free_triangle( *it1, s, t)) {
+			      countS += 3;
+			      
+			   }
+			   
+			   ++it1; 
+			   ++it2; 
+			   if (it1 == A_s.end() || it2 == A_t.end() )
+			      break;
+			}
+		     }
+		  }
+		  A_t.push_back( s );
+	       }
+	    }
+	 }
+	 logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+
+	 return countS;
+      }
+
+      /*
+       * DART-BASE (no triangle listing)
+       */
+      unsigned dart_base_free_smaller() {
+	 //	 vector < vector< node_id > > A( n, vector< node_id >() );
+	 unsigned countS = 0;
+	 
+	 for (node_id s = 0; s < n; ++s ) {
+	    for (size_t j = 0; j < adjList[s].size(); ++j) {
+	       node_id& t = adjList[s][ j ];
+	       if (s < t) {
+		  vector< node_id >& A_s = adjList[s];
+		  vector< node_id >& A_t = adjList[t];
+		  auto it1 = A_s.begin();
+		  auto it2 = A_t.begin();
+		  if (it1 == A_s.end() || it2 == A_t.end() ) {
+		     continue;
+		  }
+		  while (1) {
+		     if (*it1 < *it2) {
+			++it1;
+			if (it1 == A_s.end()) {
+			   break;
+			}
+		     } else {
+			if (*it2 < *it1) {
+			   ++it2;
+			   if (it2 == A_t.end()) {
+			      break;
+			   }
+			} else {
+			   //found a triangle
+			   if (free_triangle( *it1, s, t)) {
+			      countS += 3;
+			      
+			   }
+			   
+			   ++it1; 
+			   ++it2; 
+			   if (it1 == A_s.end() || it2 == A_t.end() )
+			      break;
+			}
+		     }
+		  }
 	       }
 	    }
 	 }

@@ -7,10 +7,12 @@ int main(int argc, char ** argv) {
    smallGraph G;
    string fname( argv[1] );
    G.read_edge_list_bin( fname );
-   G.logg(INFO, "Listing triangles..." );
-   G.list_triangles();
-   G.logg(INFO, "Starting DART..." );
-   G.dart_base_free();
+   //   G.logg(INFO, "Listing triangles..." );
+   //   G.list_triangles();
+   //   G.logg(INFO, "Starting DART..." );
+   //   G.dart_base_free();
+   G.logg(INFO, "Starting smaller DART..." );
+   G.dart_base_free_smaller();
    
 }
    
