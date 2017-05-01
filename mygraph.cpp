@@ -2206,13 +2206,13 @@ namespace mygraph {
    
    class tinyGraph {
    public:
-      vector< list< tinyEdge > > adjList;
+      vector< vector< tinyEdge > > adjList;
       unsigned n;
       Logger logg;
-      list< smTriangle > T_sol;
+      vector< smTriangle > T_sol;
       
       void init_empty_graph() {
-	 list< tinyEdge > emptyList;
+	 vector< tinyEdge > emptyList;
 	 adjList.assign(n, emptyList);
       }
 
@@ -2243,12 +2243,12 @@ namespace mygraph {
 
 	 logg(INFO, "Sorting neighbor lists..." );
 	 for (unsigned i = 0; i < n; ++i) {
-	    adjList[i].sort( tinyEdgeCompare );
-	    //	    sort( adjList[i].begin(), adjList[i].end(), tinyEdgeCompare );
+	    //	    adjList[i].sort( tinyEdgeCompare );
+	    sort( adjList[i].begin(), adjList[i].end(), tinyEdgeCompare );
 	 }
       }
 
-      void setSInList( list< tinyEdge >& l, node_id& v ) {
+      void setSInList( vector< tinyEdge >& l, node_id& v ) {
 	 auto it = l.begin();
 	 
 	 while (it->getId() != v)
@@ -2257,7 +2257,7 @@ namespace mygraph {
 	 it->setS();
       }
 
-      void pruneSInList( list< tinyEdge >& l, node_id& v ) {
+      void pruneSInList( vector< tinyEdge >& l, node_id& v ) {
 	 auto it = l.begin();
 	 
 	 while (it->getId() != v)
@@ -2277,9 +2277,9 @@ namespace mygraph {
 	 //triangle is disjoint
 	 node_id& t = st.target;
 	 node_id& v = sv.target;
-	 list< tinyEdge >& At = adjList[ t ];
-	 list< tinyEdge >& As = adjList[ s ];
-	 list< tinyEdge >& Av = adjList[ v ];
+	 vector< tinyEdge >& At = adjList[ t ];
+	 vector< tinyEdge >& As = adjList[ s ];
+	 vector< tinyEdge >& Av = adjList[ v ];
 	 setSInList( At, s );
 	 setSInList( Av, s );
 	 setSInList( Av, t );
@@ -2315,8 +2315,8 @@ namespace mygraph {
 		  continue;
 	       if (!(s < st.target))
 		  continue;
-	       list< tinyEdge >& A_s = adjList[s];
-	       list< tinyEdge >& A_t = adjList[ st.target]; //know not in S or W
+	       vector< tinyEdge >& A_s = adjList[s];
+	       vector< tinyEdge >& A_t = adjList[ st.target]; //know not in S or W
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2371,8 +2371,8 @@ namespace mygraph {
 	       if (!st.inS())
 		  continue;
 	       prunable = true;
-	       list< tinyEdge >& A_s = adjList[s];
-	       list< tinyEdge >& A_t = adjList[t]; 
+	       vector< tinyEdge >& A_s = adjList[s];
+	       vector< tinyEdge >& A_t = adjList[t]; 
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
