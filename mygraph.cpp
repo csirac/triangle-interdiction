@@ -2206,13 +2206,13 @@ namespace mygraph {
    
    class tinyGraph {
    public:
-      vector< vector< tinyEdge > > adjList;
+      vector< list< tinyEdge > > adjList;
       unsigned n;
       Logger logg;
-      vector< smTriangle > T_sol;
+      list< smTriangle > T_sol;
       
       void init_empty_graph() {
-	 vector< tinyEdge > emptyList;
+	 list< tinyEdge > emptyList;
 	 adjList.assign(n, emptyList);
       }
 
@@ -2243,11 +2243,12 @@ namespace mygraph {
 
 	 logg(INFO, "Sorting neighbor lists..." );
 	 for (unsigned i = 0; i < n; ++i) {
-	    sort( adjList[i].begin(), adjList[i].end(), tinyEdgeCompare );
+	    adjList[i].sort( tinyEdgeCompare );
+	    //	    sort( adjList[i].begin(), adjList[i].end(), tinyEdgeCompare );
 	 }
       }
 
-      void setSInList( vector< tinyEdge >& l, node_id& v ) {
+      void setSInList( list< tinyEdge >& l, node_id& v ) {
 	 auto it = l.begin();
 	 
 	 while (it->getId() != v)
@@ -2256,7 +2257,7 @@ namespace mygraph {
 	 it->setS();
       }
 
-      void pruneSInList( vector< tinyEdge >& l, node_id& v ) {
+      void pruneSInList( list< tinyEdge >& l, node_id& v ) {
 	 auto it = l.begin();
 	 
 	 while (it->getId() != v)
@@ -2276,9 +2277,9 @@ namespace mygraph {
 	 //triangle is disjoint
 	 node_id& t = st.target;
 	 node_id& v = sv.target;
-	 vector< tinyEdge >& At = adjList[ t ];
-	 vector< tinyEdge >& As = adjList[ s ];
-	 vector< tinyEdge >& Av = adjList[ v ];
+	 list< tinyEdge >& At = adjList[ t ];
+	 list< tinyEdge >& As = adjList[ s ];
+	 list< tinyEdge >& Av = adjList[ v ];
 	 setSInList( At, s );
 	 setSInList( Av, s );
 	 setSInList( Av, t );
@@ -2306,14 +2307,16 @@ namespace mygraph {
       unsigned dart_base_free() {
 	 unsigned countS = 0;
 	 for (node_id s = 0; s < n; ++s ) {
-	    for (size_t j = 0; j < adjList[s].size(); ++j) {
-	       tinyEdge& st = adjList[s][ j ];
+	    for (auto it0 = adjList[s].begin();
+		 it0 != adjList[s].end();
+		 ++it0 ) {
+	       tinyEdge& st = *it0;
 	       if (st.inS())
 		  continue;
 	       if (!(s < st.target))
 		  continue;
-	       vector< tinyEdge >& A_s = adjList[s];
-	       vector< tinyEdge >& A_t = adjList[ st.target]; //know not in S or W
+	       list< tinyEdge >& A_s = adjList[s];
+	       list< tinyEdge >& A_t = adjList[ st.target]; //know not in S or W
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2358,16 +2361,18 @@ namespace mygraph {
       void free_prune() {
 	 bool prunable;
 	 for (node_id s = 0; s < n; ++s ) {
-	    for (size_t j = 0; j < adjList[s].size(); ++j) {
-	       tinyEdge& st = adjList[s][ j ];
+	    for (auto it0 = adjList[s].begin();
+		 it0 != adjList[s].end();
+		 ++it0 ) {
+	       tinyEdge& st = *it0;
 	       node_id t = st.getId();
 	       if (!(s < t))
 		  continue;
 	       if (!st.inS())
 		  continue;
 	       prunable = true;
-	       vector< tinyEdge >& A_s = adjList[s];
-	       vector< tinyEdge >& A_t = adjList[t]; 
+	       list< tinyEdge >& A_s = adjList[s];
+	       list< tinyEdge >& A_t = adjList[t]; 
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2429,49 +2434,49 @@ namespace mygraph {
 	 return count;
       }
       
-      bool check_validity() {
-	 unsigned vertInCommon;
-	 for (auto it1 = T_sol.begin();
-	      it1 != T_sol.end();
-	      ++it1 ) {
-	    for (auto it2 = it1 + 1;
-		 it2 != T_sol.end();
-		 ++it2 ) {
-	       vertInCommon = 0;
-	       smTriangle& t1 = *it1;
-	       smTriangle& t2 = *it2;
-	       if (t1.n1 == t2.n1)
-		  ++vertInCommon;
-	       if (t1.n1 == t2.n2)
-		  ++vertInCommon;
-	       if (t1.n1 == t2.n3)
-		  ++vertInCommon;
+      // bool check_validity() {
+      // 	 unsigned vertInCommon;
+      // 	 for (auto it1 = T_sol.begin();
+      // 	      it1 != T_sol.end();
+      // 	      ++it1 ) {
+      // 	    for (auto it2 = it1;
+      // 		 it2 != T_sol.end();
+      // 		 ++it2 ) {
+      // 	       vertInCommon = 0;
+      // 	       smTriangle& t1 = *it1;
+      // 	       smTriangle& t2 = *it2;
+      // 	       if (t1.n1 == t2.n1)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n1 == t2.n2)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n1 == t2.n3)
+      // 		  ++vertInCommon;
 
-	       if (t1.n2 == t2.n1)
-		  ++vertInCommon;
-	       if (t1.n2 == t2.n2)
-		  ++vertInCommon;
-	       if (t1.n2 == t2.n3)
-		  ++vertInCommon;
+      // 	       if (t1.n2 == t2.n1)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n2 == t2.n2)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n2 == t2.n3)
+      // 		  ++vertInCommon;
 
-	       if (t1.n3 == t2.n1)
-		  ++vertInCommon;
-	       if (t1.n3 == t2.n2)
-		  ++vertInCommon;
-	       if (t1.n3 == t2.n3)
-		  ++vertInCommon;
+      // 	       if (t1.n3 == t2.n1)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n3 == t2.n2)
+      // 		  ++vertInCommon;
+      // 	       if (t1.n3 == t2.n3)
+      // 		  ++vertInCommon;
 
-	       if (vertInCommon > 1) {
-		  logg(ERROR, "Solution triangles share an edge.");
-		  cerr << t1.n1 << ' ' << t1.n2 << ' ' << t1.n3 << endl;
-		  cerr << t2.n1 << ' ' << t2.n2 << ' ' << t2.n3 << endl;
+      // 	       if (vertInCommon > 1) {
+      // 		  logg(ERROR, "Solution triangles share an edge.");
+      // 		  cerr << t1.n1 << ' ' << t1.n2 << ' ' << t1.n3 << endl;
+      // 		  cerr << t2.n1 << ' ' << t2.n2 << ' ' << t2.n3 << endl;
 		  
-		  return false;
-	       }
-	    }
-	 }
-	 return true;
-      }
+      // 		  return false;
+      // 	       }
+      // 	    }
+      // 	 }
+      // 	 return true;
+      // }
       
    };
 
