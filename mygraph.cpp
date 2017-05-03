@@ -2203,10 +2203,25 @@ namespace mygraph {
    bool operator<( const tinyEdge& a, const tinyEdge& b ) {
       return a.getId() < b.getId();
    }
+
+   /*
+    * n1, the third vertex of this triangle,
+    * will be the vertex storing this triangle
+    */
+   class tinyTriangle {
+      uint32_t n2;
+      uint32_t n3;
+   };
+   
+   //Node class
+   class tinyNode {
+      vector< tinyEdge > neis;
+      vector< tinyTriangle > solutionTriangles;
+   };
    
    class tinyGraph {
    public:
-      vector< vector< tinyEdge > > adjList;
+      vector< tinyNode > adjList;
       unsigned n;
       Logger logg;
       vector< smTriangle > T_sol;
