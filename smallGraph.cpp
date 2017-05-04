@@ -49,5 +49,6 @@ int main(int argc, char ** argv) {
 
      // G.logg(INFO, "Checking validity..." );
      // cout << G.check_validity() << endl;
+     return 0;
 }
    

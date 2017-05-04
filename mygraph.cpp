@@ -851,7 +851,6 @@ namespace mygraph {
       
       /*
        * Update dart solution upon new edge
-       * Assumes unpruned solution
        * Returns time to update solution
        */
       double dart_add_edge( node_id from, node_id to, pedge& e ) {
@@ -2173,6 +2172,10 @@ namespace mygraph {
 	 target = target & (~bitS);
       }
 
+      void unsetW() {
+	 target = target & (~bitW);
+      }
+
       tinyEdge() {
 	 target = 0;
       }
@@ -2328,6 +2331,103 @@ namespace mygraph {
 	    return true;
 	 else
 	    return false;
+      }
+
+      bool find_disjoint_triangle( uint32_t s,
+				   tinyEdge& st,
+				   tinyEdge& sv,
+				   tinyEdge& tv ) {
+	 if (st.inS())
+	    return false;
+
+	 vector< tinyEdge >& A_s = adjList[s].neis;
+	 vector< tinyEdge >& A_t = adjList[ st.target].neis; //know not in S or W
+	 auto it1 = A_s.begin();
+	 auto it2 = A_t.begin();
+	 if (it1 == A_s.end() || it2 == A_t.end() ) {
+	    return false;
+	 }
+	 while (1) {
+	    if (*it1 < *it2) {
+	       ++it1;
+	       if (it1 == A_s.end()) {
+		  break;
+	       }
+	    } else {
+	       if (*it2 < *it1) {
+		  ++it2;
+		  if (it2 == A_t.end()) {
+		     break;
+		  }
+	       } else {
+		  //found a triangle
+		  //st, *it1 = sv, *it2 = tv
+		  if ((*it1).inW()) {
+		     //unprune this edge
+		     (*it1).unsetW();
+		     (*it1).setS();
+		     //		     unprunedEdges.push_back( *it1 );
+		  } else {
+		     if ((*it2).inW()) {
+			//unprune this edge
+			(*it2).unsetW();
+			(*it2).setS();
+			//			unprunedEdges.push_back( *it2 );
+		     } else {
+			if ( !( (*it1).inS() || (*it2).inS() ) ) {
+			   //this triangle is disjoint from S
+			   sv = *it1;
+			   tv = *it2;
+			   return true;
+			}
+		     }
+		  }
+			
+		  ++it1; 
+		  ++it2; 
+		  if (it1 == A_s.end() || it2 == A_t.end() )
+		     break;
+	       }
+	    }
+	 }
+	 
+	 return false;
+      }
+
+      void dart_add_edge( node_id s, tinyEdge& st ) {
+	 tinyEdge& sv = st; //want references so edges in graph can be modified
+	 tinyEdge& tv = st;
+
+	 //	 vector< smEdge > unprunedEdges;
+	 if ( find_disjoint_triangle( s, st, sv, tv ) ) { //, unprunedEdges ) ) {
+	    //Add this triangle to S
+	    node_id& t = st.target;
+	    node_id& v = sv.target;
+
+	    tinyTriangle sT( t, v );
+	    tinyTriangle tT( s, v );
+	    tinyTriangle vT( s, t );
+	    adjList[ s ].solutionTriangles.push_back (sT);
+	    adjList[ t ].solutionTriangles.push_back (tT);
+	    adjList[ v ].solutionTriangles.push_back (vT);
+	    
+	    vector< tinyEdge >& At = adjList[ t ].neis;
+	    vector< tinyEdge >& Av = adjList[ v ].neis;
+	    setSInList( At, s );
+	    setSInList( Av, s );
+	    setSInList( Av, t );
+	    
+	    st.setS();
+	    sv.setS();
+	    tv.setS();
+
+	    //	    unprunedEdges.push_back( st );
+	    //	    unprunedEdges.push_back( sv );
+	    //	    unprunedEdges.push_back( tv );
+	    
+	 }
+
+	 //	 prune( unprunedEdges );
       }
       
       /*
@@ -2635,7 +2735,7 @@ namespace mygraph {
       }
    }
    
-}
+
 
 
 #endif
