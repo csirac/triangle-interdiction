@@ -2209,31 +2209,45 @@ namespace mygraph {
     * will be the vertex storing this triangle
     */
    class tinyTriangle {
+   public:
       uint32_t n2;
       uint32_t n3;
+
+     tinyTriangle( uint32_t n2_in, uint32_t n3_in ) {
+       n2 = n2_in;
+       n3 = n3_in;
+     }
    };
    
    //Node class
    class tinyNode {
+   public:
       vector< tinyEdge > neis;
       vector< tinyTriangle > solutionTriangles;
+
+     tinyNode () { }
+     
+     tinyNode ( const tinyNode& rhs ) {
+       neis.assign( rhs.neis.begin(), rhs.neis.end() );
+       solutionTriangles.assign( rhs.solutionTriangles.begin(), rhs.solutionTriangles.end() );
+     }
    };
    
    class tinyGraph {
    public:
-      vector< tinyNode > adjList;
-      unsigned n;
-      Logger logg;
-      vector< smTriangle > T_sol;
-      
-      void init_empty_graph() {
-	 vector< tinyEdge > emptyList;
-	 adjList.assign(n, emptyList);
-      }
+     vector< tinyNode > adjList;
+     unsigned n;
+     Logger logg;
+     vector< smTriangle > T_sol;
+     
+     void init_empty_graph() {
+       tinyNode emptyNode;
+       adjList.assign(n, emptyNode);
+     }
 
       void add_edge( unsigned from, unsigned to ) {
-	    adjList[ from ].push_back( to );
-	    adjList[ to ].push_back( from );
+	adjList[ from ].neis.push_back( to );
+	adjList[ to ].neis.push_back( from );
       }
       
       void read_edge_list_bin( string fname ) {
@@ -2259,7 +2273,7 @@ namespace mygraph {
 	 logg(INFO, "Sorting neighbor lists..." );
 	 for (unsigned i = 0; i < n; ++i) {
 	    //	    adjList[i].sort( tinyEdgeCompare );
-	    sort( adjList[i].begin(), adjList[i].end(), tinyEdgeCompare );
+	    sort( adjList[i].neis.begin(), adjList[i].neis.end(), tinyEdgeCompare );
 	 }
       }
 
@@ -2292,9 +2306,9 @@ namespace mygraph {
 	 //triangle is disjoint
 	 node_id& t = st.target;
 	 node_id& v = sv.target;
-	 vector< tinyEdge >& At = adjList[ t ];
-	 vector< tinyEdge >& As = adjList[ s ];
-	 vector< tinyEdge >& Av = adjList[ v ];
+	 vector< tinyEdge >& At = adjList[ t ].neis;
+	 //	 vector< tinyEdge >& As = adjList[ s ].neis;
+	 vector< tinyEdge >& Av = adjList[ v ].neis;
 	 setSInList( At, s );
 	 setSInList( Av, s );
 	 setSInList( Av, t );
@@ -2322,16 +2336,16 @@ namespace mygraph {
       unsigned dart_base_free() {
 	 unsigned countS = 0;
 	 for (node_id s = 0; s < n; ++s ) {
-	    for (auto it0 = adjList[s].begin();
-		 it0 != adjList[s].end();
+	    for (auto it0 = adjList[s].neis.begin();
+		 it0 != adjList[s].neis.end();
 		 ++it0 ) {
 	       tinyEdge& st = *it0;
 	       if (st.inS())
 		  continue;
 	       if (!(s < st.target))
 		  continue;
-	       vector< tinyEdge >& A_s = adjList[s];
-	       vector< tinyEdge >& A_t = adjList[ st.target]; //know not in S or W
+	       vector< tinyEdge >& A_s = adjList[s].neis;
+	       vector< tinyEdge >& A_t = adjList[ st.target].neis; //know not in S or W
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2354,8 +2368,18 @@ namespace mygraph {
 			if (free_triangle( st, *it1, *it2, s)) {
 			      countS += 3;
 			      //			      cerr << "(s, t, v) " << s << ' ' << st.getId() << ' ' (*it1).getId();
-			      smTriangle tt( s, st.getId(), (*it1).getId() );
-			      T_sol.push_back( tt );
+			      unsigned t = st.getId();
+			      unsigned v = (*it1).getId();
+			      
+			      //smTriangle tt( s, st.getId(), (*it1).getId() );
+			      //   T_sol.push_back( tt );
+			      tinyTriangle sT( t, v );
+			      tinyTriangle tT( s, v );
+			      tinyTriangle vT( s, t );
+			      adjList[ s ].solutionTriangles.push_back (sT);
+			      adjList[ t ].solutionTriangles.push_back (tT);
+			      adjList[ v ].solutionTriangles.push_back (vT);
+			      
 			      break;
 			}
 			
@@ -2376,8 +2400,8 @@ namespace mygraph {
       void free_prune() {
 	 bool prunable;
 	 for (node_id s = 0; s < n; ++s ) {
-	    for (auto it0 = adjList[s].begin();
-		 it0 != adjList[s].end();
+	    for (auto it0 = adjList[s].neis.begin();
+		 it0 != adjList[s].neis.end();
 		 ++it0 ) {
 	       tinyEdge& st = *it0;
 	       node_id t = st.getId();
@@ -2386,8 +2410,8 @@ namespace mygraph {
 	       if (!st.inS())
 		  continue;
 	       prunable = true;
-	       vector< tinyEdge >& A_s = adjList[s];
-	       vector< tinyEdge >& A_t = adjList[t]; 
+	       vector< tinyEdge >& A_s = adjList[s].neis;
+	       vector< tinyEdge >& A_t = adjList[t].neis; 
 	       auto it1 = A_s.begin();
 	       auto it2 = A_t.begin();
 	       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2435,8 +2459,8 @@ namespace mygraph {
       unsigned countS() {
 	 unsigned count = 0;
 	 for (unsigned s = 0; s < adjList.size(); ++s) {
-	    for (auto it2 = adjList[s].begin();
-		 it2 != (adjList[s]).end();
+	    for (auto it2 = adjList[s].neis.begin();
+		 it2 != (adjList[s]).neis.end();
 		 ++it2 ) {
 	       node_id t = (*it2).getId();
 	       if (s < t) {
