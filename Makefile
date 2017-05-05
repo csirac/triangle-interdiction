@@ -10,7 +10,9 @@ test: main_glpk.cpp
 cplex: main_cplex.cpp
 	g++ main_cplex.cpp -o grec_cplex ${CPPFLAGS} -lglpk ${CPLEX_FLAGS}
 er: er.cpp
-	g++ -std=c++11 er.cpp -o er `pkg-config --cflags --libs igraph` 
+	g++ -std=c++11 er.cpp -o er `pkg-config --cflags --libs igraph`
+simplify: simplify.cpp
+	g++ -std=c++11 simplify.cpp -o simplify `pkg-config --cflags --libs igraph` 
 el2bin: el2bin.cpp
 	g++ -std=c++11 el2bin.cpp -o el2bin 
 small: smallGraph.cpp

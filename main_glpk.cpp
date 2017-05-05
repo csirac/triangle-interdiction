@@ -118,22 +118,16 @@ int main(int argc, char ** argv) {
   if (bOut) {
      ofile.open( outfilename.c_str(), ios::app );
   }
-  
-  G.logg(INFO, "Reading graph...");
-  if (bBinaryFormat) {
-     G.read_edge_list_bin( fname );
-  } else {
-     G.read_edge_list( fname );
+
+  if (bKortsarz || bOpt || bTarl) {
+     G.logg(INFO, "Reading graph...");
+     if (bBinaryFormat) {
+	G.read_edge_list_bin( fname );
+     } else {
+	G.read_edge_list( fname );
+     }
+     G.logg(OUTPUT, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
   }
-  //  G.print_graph( cout );
-  // G.logg(INFO, "Verifying graph...");
-  // if( !G.verify_graph() ) {
-  //    G.logg(ERROR, "Graph structure is incorrect." );
-  //    exit(1);
-  // } else {
-  //    G.logg(INFO, "Graph structure is correct." );
-  // }
-  G.logg(OUTPUT, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
 
   double t_triangle = 0.0;
   
@@ -153,52 +147,34 @@ int main(int argc, char ** argv) {
   }
 
   if (bDart) {
-     // G.logg( INFO, "Starting dart-base..." );
-     // clock_t t_start = clock();
-
-     // unsigned size = G.dart_base();
-     // double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     // G.logg( OUTPUT, "Dart-base: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-     // G.clear_edges();
-     // G.logg( INFO, "Starting dart-base with pruning..." );
-     // t_start = clock();
-
-     // size = G.dart_base_heu();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-
-     // G.logg( OUTPUT, "Dart-base with pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-     // //     G.dart_base();
-
-     // if (G.ensure_feasibility())
-     // 	G.logg(INFO, "Pruned solution remains feasible.");
-     // else
-     // 	G.logg(WARN, "Pruned solution is infeasible!");
-     
-     // G.clear_edges();
-
+     G.logg( INFO, "Reading into data structure..." );
+     tinyGraph g;
+     if (bBinaryFormat) {
+	g.read_edge_list_bin( fname );
+     } else {
+	//	G.read_edge_list( fname );
+     }
      G.logg( INFO, "Starting dart-base..." );
      clock_t t_start = clock();
 
-     size_t size = G.dart_base_free();
+     size_t size = g.dart_base_free();
      double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
 
-     G.logg( OUTPUT, "dart-base: " + to_string(size) + " " + to_string(t_elapsed) +
-     	     " " + to_string(G.ensure_feasibility() ));
-     //     G.dart_base();
+     G.logg( OUTPUT, "dart-base: " + to_string(size) + " " + to_string(t_elapsed));
 
      if (bOut) {
-	ofile << fname << " dart-base " << G.V.size() << ' ' << G.E.size() << ' ' << size << ' ' << t_elapsed << endl;
+	ofile << fname << " dart-base " << g.n << ' ' << g.m << ' ' << size << ' ' << t_elapsed << endl;
      }
      
      G.logg(INFO, "Starting free_prune()...");
      t_start = clock();
-     G.free_prune();
+     g.free_prune();
      t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     size = G.countS();
-     G.logg( OUTPUT, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
+     size = g.countS();
+     G.logg( OUTPUT, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) );
 
      if (bOut) {
-	ofile << fname << " dart-base-prune " << G.V.size() << ' ' << G.E.size() << ' ' << size << ' ' << t_elapsed << endl;
+	ofile << fname << " dart-base-prune " << g.n << ' ' << g.m << ' ' << size << ' ' << t_elapsed << endl;
      }
      
      if (bAdd) {

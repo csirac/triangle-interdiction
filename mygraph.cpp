@@ -2239,7 +2239,8 @@ namespace mygraph {
   class tinyGraph {
   public:
     vector< tinyNode > adjList;
-    unsigned n;
+     unsigned n;
+     unsigned m;
     Logger logg;
     vector< smTriangle > T_sol;
      
@@ -2260,6 +2261,7 @@ namespace mygraph {
       ifile.read( (char*) &n, sizeof( unsigned ) );
       ifile.read( (char*) &m, sizeof( unsigned ) );
       this->n = n;
+      this->m = m;
       init_empty_graph();
 
       unsigned from,to;
@@ -2334,14 +2336,15 @@ namespace mygraph {
     }
 
     bool find_disjoint_triangle( uint32_t s,
-    				   tinyEdge& st,
-    				   tinyEdge& sv,
-    				   tinyEdge& tv ) {
+				 tinyEdge& st,
+				 tinyEdge& sv,
+				 tinyEdge& tv,
+				 vector< smEdge >& unprunedEdges) {
     	 if (st.inS())
     	    return false;
 
     	 vector< tinyEdge >& A_s = adjList[s].neis;
-    	 vector< tinyEdge >& A_t = adjList[ st.target].neis; //know not in S or W
+    	 vector< tinyEdge >& A_t = adjList[ st.getId() ].neis; //know not in S or W
     	 auto it1 = A_s.begin();
     	 auto it2 = A_t.begin();
     	 if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2365,14 +2368,20 @@ namespace mygraph {
     		  if ((*it1).inW()) {
     		     //unprune this edge
     		     (*it1).unsetW();
+		     smEdge e_tmp;
+		     e_tmp.from = s;
+		     e_tmp.to = (*it1).target;
+		     unprunedEdges.push_back( e_tmp );		     
     		     (*it1).setS();
-    		     //		     unprunedEdges.push_back( *it1 );
     		  } else {
     		     if ((*it2).inW()) {
     			//unprune this edge
     			(*it2).unsetW();
+			smEdge e_tmp;
+			e_tmp.from = st.getId();
+			e_tmp.to = (*it2).target;
+			unprunedEdges.push_back( e_tmp );		     
     			(*it2).setS();
-    			//			unprunedEdges.push_back( *it2 );
     		     } else {
     		       if ( !( (*it1).inS() || (*it2).inS() ) ) {
     			   //this triangle is disjoint from S
@@ -2394,12 +2403,16 @@ namespace mygraph {
     	 return false;
     }
 
+     void prune( vector< smEdge >& unprunedEdges ) {
+
+     }
+     
     void dart_add_edge( node_id s, tinyEdge& st ) {
     	 tinyEdge& sv = st; //want references so edges in graph can be modified
     	 tinyEdge& tv = st;
 
-    	 //	 vector< smEdge > unprunedEdges;
-    	 if ( find_disjoint_triangle( s, st, sv, tv ) ) { //, unprunedEdges ) ) {
+	 vector< smEdge > unprunedEdges;
+    	 if ( find_disjoint_triangle( s, st, sv, tv, unprunedEdges )) {
     	    //Add this triangle to S
     	    node_id& t = st.target;
     	    node_id& v = sv.target;
@@ -2421,13 +2434,18 @@ namespace mygraph {
     	    sv.setS();
     	    tv.setS();
 
-    	    //	    unprunedEdges.push_back( st );
-    	    //	    unprunedEdges.push_back( sv );
-    	    //	    unprunedEdges.push_back( tv );
+	    smEdge e_tmp;
+	    e_tmp.from = s;
+	    e_tmp.to = t;
+    	    unprunedEdges.push_back( e_tmp );
+	    e_tmp.to = v;
+	    unprunedEdges.push_back( e_tmp );
+	    e_tmp.from = t;
+	    unprunedEdges.push_back( e_tmp );
 	    
     	 }
 
-    	 //	 prune( unprunedEdges );
+	 prune( unprunedEdges );
     }
       
     /*
