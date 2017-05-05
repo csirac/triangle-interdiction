@@ -14,6 +14,8 @@ er: er.cpp
 simplify: simplify.cpp
 	g++ -std=c++11 simplify.cpp -o simplify `pkg-config --cflags --libs igraph` 
 el2bin: el2bin.cpp
-	g++ -std=c++11 el2bin.cpp -o el2bin 
+	g++ -std=c++11 el2bin.cpp -o el2bin
+bin2adj: bin2adj.cpp
+	g++ -std=c++11 bin2adj.cpp -o bin2adj -l pthread
 small: smallGraph.cpp
 	g++ smallGraph.cpp -o smg ${CPPFLAGS} -lglpk -lpthread

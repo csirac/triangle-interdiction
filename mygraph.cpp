@@ -2253,9 +2253,70 @@ namespace mygraph {
       adjList[ from ].neis.push_back( to );
       adjList[ to ].neis.push_back( from );
     }
-      
+
+     /*
+      * Removes self-loops and multi-edges
+      * Assumes sorted adjacency list in each tinyNode
+      */
+     void simplify() {
+	for (unsigned i = 0; i < n; ++i) {
+	   bool b_continue;
+	   do {
+	      b_continue = false;
+	      auto it1 = adjList[i].neis.begin();
+	      auto it2 = it1 + 1;
+	      while (it2 != adjList[i].neis.end()) {
+		 if (it1->getId() == it2->getId()) {
+		    //remove multi-edge
+		    b_continue = true;
+		    adjList[i].neis.erase( it1 );
+		    break;
+		 }
+		 if (it1->getId() == i ) {
+		    //remove loop
+		    adjList[i].neis.erase( it1 );
+		    b_continue = true;
+		    break;
+		 }
+		 if (it2->getId() == i ) {
+		    //remove loop
+		    adjList[i].neis.erase( it2 );
+		    b_continue = true;
+		    break;
+		 }
+		 
+		 ++it2; ++it1;
+	      }
+	   } while (b_continue);
+	}
+     }
+
+     void read_adj_list_bin( string fname ) {
+	ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+	unsigned n;
+	ifile.read( (char*) &n, sizeof( unsigned ) );
+
+	this->n = n;
+
+	init_empty_graph();
+	unsigned ss;
+	tinyEdge temp;
+	unsigned nei_id;
+	for ( unsigned i = 0; i < n; ++i ) {
+
+	   ifile.read( (char*) &ss, sizeof( unsigned ) );
+
+	   adjList[i].neis.assign( ss, temp );
+	   for (unsigned j = 0; j < ss; ++j) {
+	      ifile.read( (char*) &nei_id, sizeof( unsigned ) );
+	      adjList[i].neis[j].target = nei_id;
+	   }
+	}
+     }
+     
     void read_edge_list_bin( string fname ) {
-      ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+
+       ifstream ifile ( fname.c_str(), ios::in | ios::binary );
       unsigned m; //number of edges in list
       unsigned n;
       ifile.read( (char*) &n, sizeof( unsigned ) );
