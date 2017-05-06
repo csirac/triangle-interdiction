@@ -272,9 +272,10 @@ namespace mygraph {
     list< Triangle > T;   //triangle list
     list< Triangle > Tsol;   //list of triangles in solution of DART
     Logger logg;
-    //     random_device rd;
-    //     mt19937 gen(rd());
-
+    unsigned sizeS;
+    double runningTime;
+    double preprocessTime;
+    
     void save( ostream& os ) {
 	 
     }
@@ -968,6 +969,7 @@ namespace mygraph {
      * DART-BASE (no triangle listing)
      */
     unsigned dart_base_free() {
+      clock_t t_start = clock();
       vector < vector< node_id > > A( n, vector< node_id >() );
       vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
       unsigned countS = 0;
@@ -1020,6 +1022,7 @@ namespace mygraph {
 	  }
 	}
       }
+      runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
       logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
 
       return countS;
@@ -1202,6 +1205,7 @@ namespace mygraph {
       //	    for (size_t j = 0; j < V[s].v_nei_ids.size(); ++j) {
 
       logg(DEBUG, "Starting free_prune()");
+      clock_t t_start = clock();
       size_t prune_count = 0;
       for (auto st = E.begin();
 	   st != E.end();
@@ -1258,6 +1262,7 @@ namespace mygraph {
 	}
       }
 
+      runningTime += double (clock() - t_start) / CLOCKS_PER_SEC;
       logg( DEBUG, "free-prune examined " + to_string(prune_count) + " triangles");
       return;
     }
@@ -1369,6 +1374,7 @@ namespace mygraph {
 	if (i->in_S)
 	  ++count;
       }
+      sizeS = count;
       return count;
     }
 
@@ -1724,6 +1730,7 @@ namespace mygraph {
       logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
 
       logg(INFO, "Sorting neighbor ids..." );
+      clock_t t_start = clock();
       for ( auto v = V.begin(); v != V.end(); ++v ) {
 	auto p = sort_permutation( v->v_nei_ids, mycompare );
 	//				       [](const node_id& a, const node_id& b){ return a < b; } );
@@ -1733,6 +1740,7 @@ namespace mygraph {
 	//	    v->neighbors.assign( v->v_neighbors.begin(),
 	//				 v->v_neighbors.end() );
       }
+      preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
     }
       
     void read_edge_list( string fname ) {
@@ -1768,6 +1776,7 @@ namespace mygraph {
       logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
 
       logg(INFO, "Sorting neighbor ids..." );
+      clock_t t_start = clock();
       for ( auto v = V.begin(); v != V.end(); ++v ) {
 	auto p = sort_permutation( v->v_nei_ids, mycompare );
 	//				       [](const node_id& a, const node_id& b){ return a < b; } );
@@ -1777,7 +1786,7 @@ namespace mygraph {
 	//	    v->neighbors.assign( v->v_neighbors.begin(),
 	//				 v->v_neighbors.end() );
       }
-
+      preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
       // logg(INFO, "Copying edges..." );
       // vE.assign(E.begin(),E.end());
       // for (size_t i = 0; i < V.size(); ++i) {
@@ -1859,282 +1868,286 @@ namespace mygraph {
     }
   }
    
-  class smallGraph {
-  public:
-    vector< vector< node_id > > adjList;
-    unsigned n;
-    Logger logg;
-    //      map< smEdge, smTriangle > S; 
-    unordered_set< smEdge, smEdge_hash > S;
-    vector< smTriangle > T; //Triangle listing 
+  // class smallGraph {
+  // public:
+  //   vector< vector< node_id > > adjList;
+  //   unsigned n;
+  //   Logger logg;
+  //   //      map< smEdge, smTriangle > S; 
+  //   unordered_set< smEdge, smEdge_hash > S;
+  //   vector< smTriangle > T; //Triangle listing 
       
-    bool inS( smEdge& st ) {
-      return (S.find( st ) != S.end());
-    }
+  //   bool inS( smEdge& st ) {
+  //     return (S.find( st ) != S.end());
+  //   }
       
-    smallGraph() {
-      n = 0;
-    }
+  //   smallGraph() {
+  //     n = 0;
+  //   }
 
-    void init_empty_graph() {
-      vector< unsigned > emptyList;
-      adjList.assign(n, emptyList);
-    }
+  //   void init_empty_graph() {
+  //     vector< unsigned > emptyList;
+  //     adjList.assign(n, emptyList);
+  //   }
 
-    void add_edge( unsigned from, unsigned to ) {
-      adjList[ from ].push_back( to );
-      adjList[ to ].push_back( from );
-    }
+  //   void add_edge( unsigned from, unsigned to ) {
+  //     adjList[ from ].push_back( to );
+  //     adjList[ to ].push_back( from );
+  //   }
       
-    void read_edge_list_bin( string fname ) {
-      ifstream ifile ( fname.c_str(), ios::in | ios::binary );
-      unsigned m; //number of edges in list
-      unsigned n;
-      ifile.read( (char*) &n, sizeof( unsigned ) );
-      ifile.read( (char*) &m, sizeof( unsigned ) );
-      this->n = n;
-      init_empty_graph();
+  //   void read_edge_list_bin( string fname ) {
+  //     ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+  //     unsigned m; //number of edges in list
+  //     unsigned n;
+  //     ifile.read( (char*) &n, sizeof( unsigned ) );
+  //     ifile.read( (char*) &m, sizeof( unsigned ) );
+  //     this->n = n;
+  //     init_empty_graph();
 
 
-      // unsigned* fromto_arr = new unsigned [2 * m];
+  //     // unsigned* fromto_arr = new unsigned [2 * m];
 	 
-      // ifile.read( (char *) fromto_arr,  2 * m *sizeof( unsigned ) );
+  //     // ifile.read( (char *) fromto_arr,  2 * m *sizeof( unsigned ) );
 
-      // logg(INFO, "File input finished. Constructing graph..." );
+  //     // logg(INFO, "File input finished. Constructing graph..." );
 
-      // for (unsigned i = 0; i < m; ++i) {
-      //    unsigned from = fromto_arr[ 2 * i ];
-      //    unsigned to = fromto_arr[ 2 * i + 1 ];
+  //     // for (unsigned i = 0; i < m; ++i) {
+  //     //    unsigned from = fromto_arr[ 2 * i ];
+  //     //    unsigned to = fromto_arr[ 2 * i + 1 ];
 
-      //    add_edge( from, to );
-      // }
+  //     //    add_edge( from, to );
+  //     // }
 
-      // delete [] fromto_arr;
+  //     // delete [] fromto_arr;
 
-      unsigned from,to;
-      for (unsigned i = 0; i < m; ++i) {
-	ifile.read( (char *) &from,  sizeof( unsigned ) );
-	ifile.read( (char *) &to,  sizeof( unsigned ) );
+  //     unsigned from,to;
+  //     for (unsigned i = 0; i < m; ++i) {
+  // 	ifile.read( (char *) &from,  sizeof( unsigned ) );
+  // 	ifile.read( (char *) &to,  sizeof( unsigned ) );
 
-	add_edge( from, to );
-      }
-      ifile.close();
+  // 	add_edge( from, to );
+  //     }
+  //     ifile.close();
 	 
-      logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
+  //     logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
 
-      logg(INFO, "Sorting neighbor ids..." );
-      for (unsigned i = 0; i < n; ++i) {
-	sort( adjList[i].begin(), adjList[i].end() );
-      }
-    }
+  //     logg(INFO, "Sorting neighbor ids..." );
+  //     for (unsigned i = 0; i < n; ++i) {
+  // 	sort( adjList[i].begin(), adjList[i].end() );
+  //     }
+  //   }
 
-    bool free_triangle( node_id& j, node_id& s, node_id& t ) {
-      //know s < t. Need to know relation between other two pairs
-      smEdge st;
-      st.from = s;
-      st.to = t;
-      smEdge js;
-      smEdge jt;
-      if (j < s) {
-	js.from = j;
-	js.to = s;
-	jt.from = j;
-	jt.to = t;
-      } else {
-	js.from = s;
-	js.to = j;
-	if (j < t) {
-	  jt.from = j;
-	  jt.to = t;
-	} else {
-	  jt.from = t;
-	  jt.to = j;
-	}
-      }
+  //   bool free_triangle( node_id& j, node_id& s, node_id& t ) {
+  //     //know s < t. Need to know relation between other two pairs
+  //     smEdge st;
+  //     st.from = s;
+  //     st.to = t;
+  //     smEdge js;
+  //     smEdge jt;
+  //     if (j < s) {
+  // 	js.from = j;
+  // 	js.to = s;
+  // 	jt.from = j;
+  // 	jt.to = t;
+  //     } else {
+  // 	js.from = s;
+  // 	js.to = j;
+  // 	if (j < t) {
+  // 	  jt.from = j;
+  // 	  jt.to = t;
+  // 	} else {
+  // 	  jt.from = t;
+  // 	  jt.to = j;
+  // 	}
+  //     }
 	    
-      if ( ! (inS( js ) || inS(jt) || inS(st) ) ) {
-	//triangle is disjoint
-	//	    smTriangle t1;
-	//	    t1.n1 = j;
-	//	    t1.n2 = s;
-	//	    t1.n3 = t;
-	//	    S.insert( pair< smEdge, smTriangle >( js, t1 ) );
-	//	    S.insert( pair< smEdge, smTriangle >( jt, t1 ) );
-	//	    S.insert( pair< smEdge, smTriangle >( st, t1 ) );
-	S.insert( js );
-	S.insert( jt );
-	S.insert( st );
-	return true;
-      }
+  //     if ( ! (inS( js ) || inS(jt) || inS(st) ) ) {
+  // 	//triangle is disjoint
+  // 	//	    smTriangle t1;
+  // 	//	    t1.n1 = j;
+  // 	//	    t1.n2 = s;
+  // 	//	    t1.n3 = t;
+  // 	//	    S.insert( pair< smEdge, smTriangle >( js, t1 ) );
+  // 	//	    S.insert( pair< smEdge, smTriangle >( jt, t1 ) );
+  // 	//	    S.insert( pair< smEdge, smTriangle >( st, t1 ) );
+  // 	S.insert( js );
+  // 	S.insert( jt );
+  // 	S.insert( st );
+  // 	return true;
+  //     }
 
-      return false;
-    }
+  //     return false;
+  //   }
       
-    /*
-     * DART-BASE (no triangle listing)
-     */
-    unsigned dart_base_free() {
-      vector < vector< node_id > > A( n, vector< node_id >() );
-      unsigned countS = 0;
+  //   /*
+  //    * DART-BASE (no triangle listing)
+  //    */
+  //   unsigned dart_base_free() {
+  //     clock_t t_start = clock();
+  //     vector < vector< node_id > > A( n, vector< node_id >() );
+  //     unsigned countS = 0;
 	 
-      for (node_id s = 0; s < n; ++s ) {
-	for (size_t j = 0; j < adjList[s].size(); ++j) {
-	  node_id& t = adjList[s][ j ];
-	  if (s < t) {
-	    vector< node_id >& A_s = A[s];
-	    vector< node_id >& A_t = A[t];
-	    auto it1 = A_s.begin();
-	    auto it2 = A_t.begin();
-	    if (it1 == A_s.end() || it2 == A_t.end() ) {
-	      A_t.push_back( s );
-	      continue;
-	    }
-	    while (1) {
-	      if (*it1 < *it2) {
-		++it1;
-		if (it1 == A_s.end()) {
-		  break;
-		}
-	      } else {
-		if (*it2 < *it1) {
-		  ++it2;
-		  if (it2 == A_t.end()) {
-		    break;
-		  }
-		} else {
-		  //found a triangle
-		  if (free_triangle( *it1, s, t)) {
-		    countS += 3;
+  //     for (node_id s = 0; s < n; ++s ) {
+  // 	for (size_t j = 0; j < adjList[s].size(); ++j) {
+  // 	  node_id& t = adjList[s][ j ];
+  // 	  if (s < t) {
+  // 	    vector< node_id >& A_s = A[s];
+  // 	    vector< node_id >& A_t = A[t];
+  // 	    auto it1 = A_s.begin();
+  // 	    auto it2 = A_t.begin();
+  // 	    if (it1 == A_s.end() || it2 == A_t.end() ) {
+  // 	      A_t.push_back( s );
+  // 	      continue;
+  // 	    }
+  // 	    while (1) {
+  // 	      if (*it1 < *it2) {
+  // 		++it1;
+  // 		if (it1 == A_s.end()) {
+  // 		  break;
+  // 		}
+  // 	      } else {
+  // 		if (*it2 < *it1) {
+  // 		  ++it2;
+  // 		  if (it2 == A_t.end()) {
+  // 		    break;
+  // 		  }
+  // 		} else {
+  // 		  //found a triangle
+  // 		  if (free_triangle( *it1, s, t)) {
+  // 		    countS += 3;
 			      
-		  }
+  // 		  }
 			   
-		  ++it1; 
-		  ++it2; 
-		  if (it1 == A_s.end() || it2 == A_t.end() )
-		    break;
-		}
-	      }
-	    }
-	    A_t.push_back( s );
-	  }
-	}
-      }
-      logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+  // 		  ++it1; 
+  // 		  ++it2; 
+  // 		  if (it1 == A_s.end() || it2 == A_t.end() )
+  // 		    break;
+  // 		}
+  // 	      }
+  // 	    }
+  // 	    A_t.push_back( s );
+  // 	  }
+  // 	}
+  //     }
 
-      return countS;
-    }
+  //     runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+  //     logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
 
-    /*
-     * DART-BASE (no triangle listing)
-     */
-    unsigned dart_base_free_smaller() {
-      //	 vector < vector< node_id > > A( n, vector< node_id >() );
-      unsigned countS = 0;
+  //     return countS;
+  //   }
+
+  //   /*
+  //    * DART-BASE (no triangle listing)
+  //    */
+  //   unsigned dart_base_free_smaller() {
+  //     //	 vector < vector< node_id > > A( n, vector< node_id >() );
+  //     unsigned countS = 0;
 	 
-      for (node_id s = 0; s < n; ++s ) {
-	for (size_t j = 0; j < adjList[s].size(); ++j) {
-	  node_id& t = adjList[s][ j ];
-	  if (s < t) {
-	    vector< node_id >& A_s = adjList[s];
-	    vector< node_id >& A_t = adjList[t];
-	    auto it1 = A_s.begin();
-	    auto it2 = A_t.begin();
-	    if (it1 == A_s.end() || it2 == A_t.end() ) {
-	      continue;
-	    }
-	    while (1) {
-	      if (*it1 < *it2) {
-		++it1;
-		if (it1 == A_s.end()) {
-		  break;
-		}
-	      } else {
-		if (*it2 < *it1) {
-		  ++it2;
-		  if (it2 == A_t.end()) {
-		    break;
-		  }
-		} else {
-		  //found a triangle
-		  if (free_triangle( *it1, s, t)) {
-		    countS += 3;
+  //     for (node_id s = 0; s < n; ++s ) {
+  // 	for (size_t j = 0; j < adjList[s].size(); ++j) {
+  // 	  node_id& t = adjList[s][ j ];
+  // 	  if (s < t) {
+  // 	    vector< node_id >& A_s = adjList[s];
+  // 	    vector< node_id >& A_t = adjList[t];
+  // 	    auto it1 = A_s.begin();
+  // 	    auto it2 = A_t.begin();
+  // 	    if (it1 == A_s.end() || it2 == A_t.end() ) {
+  // 	      continue;
+  // 	    }
+  // 	    while (1) {
+  // 	      if (*it1 < *it2) {
+  // 		++it1;
+  // 		if (it1 == A_s.end()) {
+  // 		  break;
+  // 		}
+  // 	      } else {
+  // 		if (*it2 < *it1) {
+  // 		  ++it2;
+  // 		  if (it2 == A_t.end()) {
+  // 		    break;
+  // 		  }
+  // 		} else {
+  // 		  //found a triangle
+  // 		  if (free_triangle( *it1, s, t)) {
+  // 		    countS += 3;
 			      
-		  }
+  // 		  }
 			   
-		  ++it1; 
-		  ++it2; 
-		  if (it1 == A_s.end() || it2 == A_t.end() )
-		    break;
-		}
-	      }
-	    }
-	  }
-	}
-      }
-      logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+  // 		  ++it1; 
+  // 		  ++it2; 
+  // 		  if (it1 == A_s.end() || it2 == A_t.end() )
+  // 		    break;
+  // 		}
+  // 	      }
+  // 	    }
+  // 	  }
+  // 	}
+  //     }
+  //     logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
 
-      return countS;
-    }
+  //     return countS;
+  //   }
 
-    void list_triangles() {
-      vector < vector< node_id > > A( n, vector< node_id >() );
-      vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
-      size_t count = 0;
+  //   void list_triangles() {
+  //     vector < vector< node_id > > A( n, vector< node_id >() );
+  //     vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
+  //     size_t count = 0;
 	 
-      for (node_id s = 0; s < n; ++s ) {
-	for (size_t j = 0; j < adjList[s].size(); ++j) {
-	  node_id& t = adjList[s][ j ];
-	  if (s < t) {
-	    vector< node_id >& A_s = A[s];
-	    vector< node_id >& A_t = A[t];
-	    vector< size_t >& I_s = I[s];
-	    vector< size_t >& I_t = I[t];
-	    auto it1 = A_s.begin();
-	    auto it2 = A_t.begin();
-	    if (it1 == A_s.end() || it2 == A_t.end() ) {
-	      A_t.push_back( s );
-	      I_t.push_back( j );
-	      continue;
-	    }
-	    auto it3 = I_s.begin();
-	    auto it4 = I_t.begin();
-	    while (1) {
-	      if (*it1 < *it2) {
-		++it1;
-		++it3;
-		if (it1 == A_s.end()) {
-		  break;
-		}
-	      } else {
-		if (*it2 < *it1) {
-		  ++it2;
-		  ++it4;
-		  if (it2 == A_t.end()) {
-		    break;
-		  }
-		} else {
-		  //found a triangle
-		  //add_triangle( *it1, *it3, *it4, j, s, t);
-		  //			   smTriangle tt( *it1, s, t );
-		  //			   T.push_back(tt);
-		  ++count;
-		  ++it1; ++it3;
-		  ++it2; ++it4;
-		  if (it1 == A_s.end() || it2 == A_t.end() )
-		    break;
-		}
-	      }
-	    }
-	    A_t.push_back( s );
-	    I_t.push_back( j );
-	  }
-	}
-      }
-      logg( INFO, to_string(count) + " triangles found.");
+  //     for (node_id s = 0; s < n; ++s ) {
+  // 	for (size_t j = 0; j < adjList[s].size(); ++j) {
+  // 	  node_id& t = adjList[s][ j ];
+  // 	  if (s < t) {
+  // 	    vector< node_id >& A_s = A[s];
+  // 	    vector< node_id >& A_t = A[t];
+  // 	    vector< size_t >& I_s = I[s];
+  // 	    vector< size_t >& I_t = I[t];
+  // 	    auto it1 = A_s.begin();
+  // 	    auto it2 = A_t.begin();
+  // 	    if (it1 == A_s.end() || it2 == A_t.end() ) {
+  // 	      A_t.push_back( s );
+  // 	      I_t.push_back( j );
+  // 	      continue;
+  // 	    }
+  // 	    auto it3 = I_s.begin();
+  // 	    auto it4 = I_t.begin();
+  // 	    while (1) {
+  // 	      if (*it1 < *it2) {
+  // 		++it1;
+  // 		++it3;
+  // 		if (it1 == A_s.end()) {
+  // 		  break;
+  // 		}
+  // 	      } else {
+  // 		if (*it2 < *it1) {
+  // 		  ++it2;
+  // 		  ++it4;
+  // 		  if (it2 == A_t.end()) {
+  // 		    break;
+  // 		  }
+  // 		} else {
+  // 		  //found a triangle
+  // 		  //add_triangle( *it1, *it3, *it4, j, s, t);
+  // 		  //			   smTriangle tt( *it1, s, t );
+  // 		  //			   T.push_back(tt);
+  // 		  ++count;
+  // 		  ++it1; ++it3;
+  // 		  ++it2; ++it4;
+  // 		  if (it1 == A_s.end() || it2 == A_t.end() )
+  // 		    break;
+  // 		}
+  // 	      }
+  // 	    }
+  // 	    A_t.push_back( s );
+  // 	    I_t.push_back( j );
+  // 	  }
+  // 	}
+  //     }
+  //     logg( INFO, to_string(count) + " triangles found.");
 	       
-    }
+  //   }
 
-  };
+  // };
+  
 
   //   uint32_t three = 3;
   //   uint32_t one = 1;
@@ -2147,7 +2160,8 @@ namespace mygraph {
     //last 30 bits are target node_id
     //first bit is inS, second bit is inW
     uint32_t target;
-
+    uint32_t matePairLoc; //Location of mate pair edge
+     
     node_id getId() const {
       return target & bitMask;
     }
@@ -2186,9 +2200,15 @@ namespace mygraph {
     tinyEdge( node_id nid ) {
       target = nid; //inS = inW = false;
     }
-      
+
+    tinyEdge( node_id nid, uint32_t mp ) {
+      target = nid;
+      matePairLoc = mp;
+    }
+     
     tinyEdge( const tinyEdge& rhs ) {
       target = rhs.target;
+      matePairLoc = rhs.matePairLoc;
     }
   };
 
@@ -2239,84 +2259,91 @@ namespace mygraph {
   class tinyGraph {
   public:
     vector< tinyNode > adjList;
-     unsigned n;
-     unsigned m;
+    unsigned n;
+    unsigned m;
     Logger logg;
     vector< smTriangle > T_sol;
-     
+    double preprocessTime;
+    
     void init_empty_graph() {
       tinyNode emptyNode;
       adjList.assign(n, emptyNode);
     }
 
     void add_edge( unsigned from, unsigned to ) {
-      adjList[ from ].neis.push_back( to );
-      adjList[ to ].neis.push_back( from );
+      tinyEdge FT( to, adjList[to].neis.size() );
+      tinyEdge TF( from, adjList[from].neis.size() );
+      adjList[ from ].neis.push_back( FT );
+      adjList[ to ].neis.push_back( TF );
     }
 
-     /*
-      * Removes self-loops and multi-edges
-      * Assumes sorted adjacency list in each tinyNode
-      */
-     void simplify() {
-	for (unsigned i = 0; i < n; ++i) {
-	   bool b_continue;
-	   do {
-	      b_continue = false;
-	      auto it1 = adjList[i].neis.begin();
-	      auto it2 = it1 + 1;
-	      while (it2 != adjList[i].neis.end()) {
-		 if (it1->getId() == it2->getId()) {
-		    //remove multi-edge
-		    b_continue = true;
-		    adjList[i].neis.erase( it1 );
-		    break;
-		 }
-		 if (it1->getId() == i ) {
-		    //remove loop
-		    adjList[i].neis.erase( it1 );
-		    b_continue = true;
-		    break;
-		 }
-		 if (it2->getId() == i ) {
-		    //remove loop
-		    adjList[i].neis.erase( it2 );
-		    b_continue = true;
-		    break;
-		 }
+    /*
+     * Removes self-loops and multi-edges
+     * Assumes sorted adjacency list in each tinyNode
+     */
+    void simplify() {
+      for (unsigned i = 0; i < n; ++i) {
+	bool b_continue;
+	do {
+	  b_continue = false;
+	  auto it1 = adjList[i].neis.begin();
+	  auto it2 = it1 + 1;
+	  while (it2 != adjList[i].neis.end()) {
+	    if (it1->getId() == it2->getId()) {
+	      //remove multi-edge
+	      b_continue = true;
+	      adjList[i].neis.erase( it1 );
+	      break;
+	    }
+	    if (it1->getId() == i ) {
+	      //remove loop
+	      adjList[i].neis.erase( it1 );
+	      b_continue = true;
+	      break;
+	    }
+	    if (it2->getId() == i ) {
+	      //remove loop
+	      adjList[i].neis.erase( it2 );
+	      b_continue = true;
+	      break;
+	    }
 		 
-		 ++it2; ++it1;
-	      }
-	   } while (b_continue);
+	    ++it2; ++it1;
+	  }
+	} while (b_continue);
+      }
+    }
+
+    void read_adj_list_bin( string fname ) {
+      ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+      unsigned n;
+      ifile.read( (char*) &n, sizeof( unsigned ) );
+
+      this->n = n;
+
+      init_empty_graph();
+      unsigned ss;
+      tinyEdge temp;
+      unsigned nei_id;
+      clock_t t_start = clock();
+      for ( unsigned i = 0; i < n; ++i ) {
+
+	ifile.read( (char*) &ss, sizeof( unsigned ) );
+
+	adjList[i].neis.assign( ss, temp );
+	for (unsigned j = 0; j < ss; ++j) {
+	  ifile.read( (char*) &nei_id, sizeof( unsigned ) );
+	  adjList[i].neis[j].target = nei_id;
 	}
-     }
+      }
+      preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+    }
 
-     void read_adj_list_bin( string fname ) {
-	ifstream ifile ( fname.c_str(), ios::in | ios::binary );
-	unsigned n;
-	ifile.read( (char*) &n, sizeof( unsigned ) );
-
-	this->n = n;
-
-	init_empty_graph();
-	unsigned ss;
-	tinyEdge temp;
-	unsigned nei_id;
-	for ( unsigned i = 0; i < n; ++i ) {
-
-	   ifile.read( (char*) &ss, sizeof( unsigned ) );
-
-	   adjList[i].neis.assign( ss, temp );
-	   for (unsigned j = 0; j < ss; ++j) {
-	      ifile.read( (char*) &nei_id, sizeof( unsigned ) );
-	      adjList[i].neis[j].target = nei_id;
-	   }
-	}
-     }
-     
-    void read_edge_list_bin( string fname ) {
-
-       ifstream ifile ( fname.c_str(), ios::in | ios::binary );
+    /*
+     * Returns pre-processing time for graph
+     */
+    double read_edge_list_bin( string fname ) {
+      ifstream ifile ( fname.c_str(), ios::in | ios::binary );
       unsigned m; //number of edges in list
       unsigned n;
       ifile.read( (char*) &n, sizeof( unsigned ) );
@@ -2337,10 +2364,18 @@ namespace mygraph {
       logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
 
       logg(INFO, "Sorting neighbor lists..." );
+      clock_t t_start = clock();
       for (unsigned i = 0; i < n; ++i) {
 	//	    adjList[i].sort( tinyEdgeCompare );
 	sort( adjList[i].neis.begin(), adjList[i].neis.end(), tinyEdgeCompare );
+	//update location of mate pairs
+	for (unsigned j = 0; j < adjList[i].neis.size(); ++j) {
+	  uint32_t& target = adjList[i].neis[ j ].target;
+	  uint32_t& mp = adjList[i].neis[ j ].matePairLoc;
+	  (adjList[ target  ].neis[ mp ]).matePairLoc = j;
+	}
       }
+      return double (clock() - t_start) / CLOCKS_PER_SEC;
     }
 
     void setSInList( vector< tinyEdge >& l, node_id& v ) {
@@ -2375,9 +2410,12 @@ namespace mygraph {
       vector< tinyEdge >& At = adjList[ t ].neis;
       //	 vector< tinyEdge >& As = adjList[ s ].neis;
       vector< tinyEdge >& Av = adjList[ v ].neis;
-      setSInList( At, s );
-      setSInList( Av, s );
-      setSInList( Av, t );
+      //      setSInList( At, s );
+      //      setSInList( Av, s );
+      //      setSInList( Av, t );
+      At[ st.matePairLoc ].setS();
+      Av[ sv.matePairLoc ].setS();
+      Av[ tv.matePairLoc ].setS();
 	 
       st.setS();
       sv.setS();
@@ -2401,112 +2439,112 @@ namespace mygraph {
 				 tinyEdge& sv,
 				 tinyEdge& tv,
 				 vector< smEdge >& unprunedEdges) {
-    	 if (st.inS())
-    	    return false;
+      if (st.inS())
+	return false;
 
-    	 vector< tinyEdge >& A_s = adjList[s].neis;
-    	 vector< tinyEdge >& A_t = adjList[ st.getId() ].neis; //know not in S or W
-    	 auto it1 = A_s.begin();
-    	 auto it2 = A_t.begin();
-    	 if (it1 == A_s.end() || it2 == A_t.end() ) {
-    	    return false;
-    	 }
-    	 while (1) {
-    	    if (*it1 < *it2) {
-    	       ++it1;
-    	       if (it1 == A_s.end()) {
-    		  break;
-    	       }
-    	    } else {
-    	       if (*it2 < *it1) {
-    		  ++it2;
-    		  if (it2 == A_t.end()) {
-    		     break;
-    		  }
-    	       } else {
-    		  //found a triangle
-    		  //st, *it1 = sv, *it2 = tv
-    		  if ((*it1).inW()) {
-    		     //unprune this edge
-    		     (*it1).unsetW();
-		     smEdge e_tmp;
-		     e_tmp.from = s;
-		     e_tmp.to = (*it1).target;
-		     unprunedEdges.push_back( e_tmp );		     
-    		     (*it1).setS();
-    		  } else {
-    		     if ((*it2).inW()) {
-    			//unprune this edge
-    			(*it2).unsetW();
-			smEdge e_tmp;
-			e_tmp.from = st.getId();
-			e_tmp.to = (*it2).target;
-			unprunedEdges.push_back( e_tmp );		     
-    			(*it2).setS();
-    		     } else {
-    		       if ( !( (*it1).inS() || (*it2).inS() ) ) {
-    			   //this triangle is disjoint from S
-    			 sv = *it1;
-    			 tv = *it2;
-    			 return true;
-    		       }
-    		     }
-    		  }
+      vector< tinyEdge >& A_s = adjList[s].neis;
+      vector< tinyEdge >& A_t = adjList[ st.getId() ].neis; //know not in S or W
+      auto it1 = A_s.begin();
+      auto it2 = A_t.begin();
+      if (it1 == A_s.end() || it2 == A_t.end() ) {
+	return false;
+      }
+      while (1) {
+	if (*it1 < *it2) {
+	  ++it1;
+	  if (it1 == A_s.end()) {
+	    break;
+	  }
+	} else {
+	  if (*it2 < *it1) {
+	    ++it2;
+	    if (it2 == A_t.end()) {
+	      break;
+	    }
+	  } else {
+	    //found a triangle
+	    //st, *it1 = sv, *it2 = tv
+	    if ((*it1).inW()) {
+	      //unprune this edge
+	      (*it1).unsetW();
+	      smEdge e_tmp;
+	      e_tmp.from = s;
+	      e_tmp.to = (*it1).target;
+	      unprunedEdges.push_back( e_tmp );		     
+	      (*it1).setS();
+	    } else {
+	      if ((*it2).inW()) {
+		//unprune this edge
+		(*it2).unsetW();
+		smEdge e_tmp;
+		e_tmp.from = st.getId();
+		e_tmp.to = (*it2).target;
+		unprunedEdges.push_back( e_tmp );		     
+		(*it2).setS();
+	      } else {
+		if ( !( (*it1).inS() || (*it2).inS() ) ) {
+		  //this triangle is disjoint from S
+		  sv = *it1;
+		  tv = *it2;
+		  return true;
+		}
+	      }
+	    }
 			
-    		  ++it1; 
-    		  ++it2; 
-    		  if (it1 == A_s.end() || it2 == A_t.end() )
-    		     break;
-    	       }
-    	    }
-    	 }
+	    ++it1; 
+	    ++it2; 
+	    if (it1 == A_s.end() || it2 == A_t.end() )
+	      break;
+	  }
+	}
+      }
 	 
-    	 return false;
+      return false;
     }
 
-     void prune( vector< smEdge >& unprunedEdges ) {
+    void prune( vector< smEdge >& unprunedEdges ) {
 
-     }
+    }
      
     void dart_add_edge( node_id s, tinyEdge& st ) {
-    	 tinyEdge& sv = st; //want references so edges in graph can be modified
-    	 tinyEdge& tv = st;
+      tinyEdge& sv = st; //want references so edges in graph can be modified
+      tinyEdge& tv = st;
 
-	 vector< smEdge > unprunedEdges;
-    	 if ( find_disjoint_triangle( s, st, sv, tv, unprunedEdges )) {
-    	    //Add this triangle to S
-    	    node_id& t = st.target;
-    	    node_id& v = sv.target;
+      vector< smEdge > unprunedEdges;
+      if ( find_disjoint_triangle( s, st, sv, tv, unprunedEdges )) {
+	//Add this triangle to S
+	node_id& t = st.target;
+	node_id& v = sv.target;
 
-    	    tinyTriangle sT( t, v );
-    	    tinyTriangle tT( s, v );
-    	    tinyTriangle vT( s, t );
-    	    adjList[ s ].solutionTriangles.push_back (sT);
-    	    adjList[ t ].solutionTriangles.push_back (tT);
-    	    adjList[ v ].solutionTriangles.push_back (vT);
+	tinyTriangle sT( t, v );
+	tinyTriangle tT( s, v );
+	tinyTriangle vT( s, t );
+	adjList[ s ].solutionTriangles.push_back (sT);
+	adjList[ t ].solutionTriangles.push_back (tT);
+	adjList[ v ].solutionTriangles.push_back (vT);
 	    
-    	    vector< tinyEdge >& At = adjList[ t ].neis;
-    	    vector< tinyEdge >& Av = adjList[ v ].neis;
-    	    setSInList( At, s );
-    	    setSInList( Av, s );
-    	    setSInList( Av, t );
+	vector< tinyEdge >& At = adjList[ t ].neis;
+	vector< tinyEdge >& Av = adjList[ v ].neis;
+	setSInList( At, s );
+	setSInList( Av, s );
+	setSInList( Av, t );
 	    
-    	    st.setS();
-    	    sv.setS();
-    	    tv.setS();
+	st.setS();
+	sv.setS();
+	tv.setS();
 
-	    smEdge e_tmp;
-	    e_tmp.from = s;
-	    e_tmp.to = t;
-    	    unprunedEdges.push_back( e_tmp );
-	    e_tmp.to = v;
-	    unprunedEdges.push_back( e_tmp );
-	    e_tmp.from = t;
-	    unprunedEdges.push_back( e_tmp );
+	smEdge e_tmp;
+	e_tmp.from = s;
+	e_tmp.to = t;
+	unprunedEdges.push_back( e_tmp );
+	e_tmp.to = v;
+	unprunedEdges.push_back( e_tmp );
+	e_tmp.from = t;
+	unprunedEdges.push_back( e_tmp );
 	    
-    	 }
+      }
 
-	 prune( unprunedEdges );
+      prune( unprunedEdges );
     }
       
     /*
@@ -2629,7 +2667,9 @@ namespace mygraph {
 	  if (prunable) {
 	    st.unsetS();
 	    st.setW();
-	    pruneSInList( A_t, s );
+	    //	    pruneSInList( A_t, s );
+	    A_t[ st.matePairLoc ].unsetS();
+	    A_t[ st.matePairLoc ].setW();
 	  }
 	}
       }
