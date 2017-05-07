@@ -2160,7 +2160,7 @@ namespace mygraph {
     //last 30 bits are target node_id
     //first bit is inS, second bit is inW
     uint32_t target;
-    uint32_t matePairLoc; //Location of mate pair edge
+    //    uint32_t matePairLoc; //Location of mate pair edge
      
     node_id getId() const {
       return target & bitMask;
@@ -2203,12 +2203,12 @@ namespace mygraph {
 
     tinyEdge( node_id nid, uint32_t mp ) {
       target = nid;
-      matePairLoc = mp;
+      //      matePairLoc = mp;
     }
      
     tinyEdge( const tinyEdge& rhs ) {
       target = rhs.target;
-      matePairLoc = rhs.matePairLoc;
+      //      matePairLoc = rhs.matePairLoc;
     }
   };
 
@@ -2369,11 +2369,11 @@ namespace mygraph {
 	//	    adjList[i].sort( tinyEdgeCompare );
 	sort( adjList[i].neis.begin(), adjList[i].neis.end(), tinyEdgeCompare );
 	//update location of mate pairs
-	for (unsigned j = 0; j < adjList[i].neis.size(); ++j) {
-	  uint32_t& target = adjList[i].neis[ j ].target;
-	  uint32_t& mp = adjList[i].neis[ j ].matePairLoc;
-	  (adjList[ target  ].neis[ mp ]).matePairLoc = j;
-	}
+	//	for (unsigned j = 0; j < adjList[i].neis.size(); ++j) {
+	//	  uint32_t& target = adjList[i].neis[ j ].target;
+	//	  uint32_t& mp = adjList[i].neis[ j ].matePairLoc;
+	//	  (adjList[ target  ].neis[ mp ]).matePairLoc = j;
+	//}
       }
       return double (clock() - t_start) / CLOCKS_PER_SEC;
     }
@@ -2410,12 +2410,12 @@ namespace mygraph {
       vector< tinyEdge >& At = adjList[ t ].neis;
       //	 vector< tinyEdge >& As = adjList[ s ].neis;
       vector< tinyEdge >& Av = adjList[ v ].neis;
-      //      setSInList( At, s );
-      //      setSInList( Av, s );
-      //      setSInList( Av, t );
-      At[ st.matePairLoc ].setS();
-      Av[ sv.matePairLoc ].setS();
-      Av[ tv.matePairLoc ].setS();
+      setSInList( At, s );
+      setSInList( Av, s );
+      setSInList( Av, t );
+      //      At[ st.matePairLoc ].setS();
+      //      Av[ sv.matePairLoc ].setS();
+      //      Av[ tv.matePairLoc ].setS();
 	 
       st.setS();
       sv.setS();
@@ -2667,9 +2667,9 @@ namespace mygraph {
 	  if (prunable) {
 	    st.unsetS();
 	    st.setW();
-	    //	    pruneSInList( A_t, s );
-	    A_t[ st.matePairLoc ].unsetS();
-	    A_t[ st.matePairLoc ].setW();
+	    pruneSInList( A_t, s );
+	    //	    A_t[ st.matePairLoc ].unsetS();
+	    //	    A_t[ st.matePairLoc ].setW();
 	  }
 	}
       }
