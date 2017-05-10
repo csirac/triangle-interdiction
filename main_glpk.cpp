@@ -9,7 +9,9 @@
 #include "proc_size.cpp"
 
 double randomAddEdges( Graph& G, unsigned mAdd);
+double randomAddEdges( tinyGraph& G, unsigned mAdd);
 double randomAddAndRemoveEdges( Graph& G, unsigned mAdd);
+double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd);
 
 void outputFile( ostream& os,
 		 string& fname,
@@ -41,6 +43,8 @@ void print_help() {
        << "-K [run 2-approx. of Kortsarz et al.]" << endl
        << "-O [run optimal solution via GNU GLPK]" << endl
        << "-A <m_add> (run DART, then adaptively add <m_add> random edges to the network)" << endl
+       << "-R <m_remove> (run DART, then adaptively remove <m_remove> random edges from the network)" << endl
+       << "-S <m_addremove> (run DART, then adaptively add <m_addremove> random edges to the network, and then remove the same edges)" << endl
        << "-t [time limit in hours, default is 4]" << endl
        << "-x [Max number of threads, default is 18]" << endl;
   
@@ -75,8 +79,11 @@ int main(int argc, char ** argv) {
   bool bAdd = false;
   string outfilename;
   bool bOut = false;
+  bool bRemove = false;
+  unsigned mRemove;
+  bool bAddRemove = false;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:g:o:") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:") ) != -1) {
     switch(c) {
     case 'o':
        s_arg.assign( optarg );
@@ -85,6 +92,16 @@ int main(int argc, char ** argv) {
        break;
     case 'A':
        bAdd = true;
+       s_arg.assign( optarg );
+       mAdd = stoi( s_arg );
+       break;
+    case 'R':
+       bRemove = true;
+       s_arg.assign( optarg );
+       mRemove = stoi( s_arg );
+       break;
+    case 'S':
+       bAddRemove = true;
        s_arg.assign( optarg );
        mAdd = stoi( s_arg );
        break;
@@ -243,62 +260,6 @@ int main(int argc, char ** argv) {
 	}
      }
 
-
-     
-     // G.logg( INFO, "Starting dart-base-free..." );
-     // t_start = clock();
-
-     // size = G.dart_base_free();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     
-     // G.logg( INFO, "dart-base-free: " + to_string(size) + " " + to_string(t_elapsed) +
-     // 	     " " + to_string(G.ensure_feasibility() ));
-     // //     G.dart_base();
-     // G.logg(INFO, "Starting better_prune()...");
-     // t_start = clock();
-     // G.better_prune_S();
-     // t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.count_infeasible() ));
-
-     // auto e1 = G.E.begin();
-     // auto e2 = H.E.begin();
-
-     // while (e1 != G.E.end()) {
-     // 	if (e1->in_S != e2->in_S) {
-     // 	   cerr << "Soultions disagree on edge " << e1-> to << ' ' << e1->from << endl;
-     // 	   cerr << "H: " << e2->to << ' ' << e2->from << endl;
-     // 	   cerr << e1->in_S << ' ' << e2->in_S << endl;
-     // 	}
-     // 	++e1; ++e2;
-     // }
-     
-     G.clear_edges();
-
-     // G.logg( INFO, "Starting dart-base-integrated..." );
-     // t_start = clock();
-
-     // G.dart_base_integrated();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "dart-base-integrated: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-
-     // G.logg( INFO, "Starting dart-base-free..." );
-     // t_start = clock();
-
-     // size = G.dart_base_free();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-
-     // G.logg( INFO, "dart-base-free: " + to_string(size) + " " + to_string(t_elapsed) +
-     // 	     " " + to_string(G.ensure_feasibility() ));
-     // //     G.dart_base();
-     // G.logg(INFO, "Starting free_prune_old()...");
-     // t_start = clock();
-     // G.free_prune_old();
-     // t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-     
      G.clear_edges();
   }
   
@@ -351,98 +312,24 @@ int main(int argc, char ** argv) {
      }
      
      if (bAdd) {
-	G.init_dynamic();
-	if( !G.verify_graph() ) {
-	   G.logg(ERROR, "Graph structure is incorrect." );
-	   exit(1);
-	} else {
-	   G.logg(INFO, "Graph structure is correct." );
-	}
-	
-	G.logg(INFO, "Adding and removing edges...");
-	t_elapsed += randomAddAndRemoveEdges( G, mAdd );
-	size = G.countS();
-	G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+	G.logg(INFO, "Adding edges...");
+	t_elapsed += randomAddEdges( g, mAdd );
+	size = g.countS();
+	G.logg( INFO, "After adding " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
 
-	G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
-
-	G.logg(DEBUG, "Comprehensive feasibility check...");
-	G.T.clear();
-	G.init_static();
-	if( !G.verify_graph() ) {
-	   G.logg(ERROR, "Graph structure is incorrect." );
-	   exit(1);
-	} else {
-	   G.logg(INFO, "Graph structure is correct." );
-	}
-
-	G.list_triangles();
-	G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
-	if (G.ensure_feasibility()) {
-	   G.logg(DEBUG, "Dart_add has maintained feasibility...");
-	}  else {
-	   G.logg(ERROR, "Dart_add has violated feasibility.");
-	}
+	G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
      }
 
+     if (bAddRemove) {
+	G.logg(INFO, "Adding and removing edges...");
+	t_elapsed += randomAddAndRemoveEdges( g, mAdd );
+	size = g.countS();
+	G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
 
-     
-     // G.logg( INFO, "Starting dart-base-free..." );
-     // t_start = clock();
+	G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+     }
 
-     // size = G.dart_base_free();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     
-     // G.logg( INFO, "dart-base-free: " + to_string(size) + " " + to_string(t_elapsed) +
-     // 	     " " + to_string(G.ensure_feasibility() ));
-     // //     G.dart_base();
-     // G.logg(INFO, "Starting better_prune()...");
-     // t_start = clock();
-     // G.better_prune_S();
-     // t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.count_infeasible() ));
-
-     // auto e1 = G.E.begin();
-     // auto e2 = H.E.begin();
-
-     // while (e1 != G.E.end()) {
-     // 	if (e1->in_S != e2->in_S) {
-     // 	   cerr << "Soultions disagree on edge " << e1-> to << ' ' << e1->from << endl;
-     // 	   cerr << "H: " << e2->to << ' ' << e2->from << endl;
-     // 	   cerr << e1->in_S << ' ' << e2->in_S << endl;
-     // 	}
-     // 	++e1; ++e2;
-     // }
-     
      G.clear_edges();
-
-     // G.logg( INFO, "Starting dart-base-integrated..." );
-     // t_start = clock();
-
-     // G.dart_base_integrated();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "dart-base-integrated: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-
-     // G.logg( INFO, "Starting dart-base-free..." );
-     // t_start = clock();
-
-     // size = G.dart_base_free();
-     // t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-
-     // G.logg( INFO, "dart-base-free: " + to_string(size) + " " + to_string(t_elapsed) +
-     // 	     " " + to_string(G.ensure_feasibility() ));
-     // //     G.dart_base();
-     // G.logg(INFO, "Starting free_prune_old()...");
-     // t_start = clock();
-     // G.free_prune_old();
-     // t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     // size = G.countS();
-     // G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-     
-     G.clear_edges();
-     
   }
 
   if (bTarl) {
@@ -567,6 +454,62 @@ int main(int argc, char ** argv) {
 
   of.close();
   return 0;
+}
+
+/*
+ * Add random edges to G and update the Dart solution
+ * Returns the total time elapsed
+ */
+
+double randomAddEdges( tinyGraph& G, unsigned mAdd) {
+   random_device rd;
+   mt19937 gen( rd() );
+   uniform_int_distribution<> vdist(0, G.n - 1);
+   double t_elapsed = 0.0;
+   
+   unsigned eAdded = 0;
+   while (eAdded < mAdd) {
+      node_id from = vdist( gen );
+      node_id to = vdist( gen );
+      vector< tinyEdge >::iterator e;
+      if ( G.add_edge_half( from, to, e ) ) {
+	G.add_edge_half(to, from, e );
+	G.m += 1;
+	 t_elapsed += G.dart_add_edge( to, e );
+	 ++eAdded;
+      }
+   }
+   return t_elapsed;
+}
+
+double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd) {
+   random_device rd;
+   mt19937 gen( rd() );
+   uniform_int_distribution<> vdist(0, G.n - 1);
+   double t_elapsed = 0.0;
+   
+   unsigned eAdded = 0;
+   vector< node_id > edgesAdded;
+   while (eAdded < mAdd) {
+      node_id from = vdist( gen );
+      node_id to = vdist( gen );
+      vector< tinyEdge >::iterator e;
+      if ( G.add_edge_half( from, to, e ) ) {
+	G.add_edge_half(to, from, e );
+	edgesAdded.push_back( to );
+	edgesAdded.push_back( from );
+	G.m += 1;
+	t_elapsed += G.dart_add_edge( to, e );
+	++eAdded;
+      }
+   }
+
+   for (unsigned i = 0; i < edgesAdded.size(); i += 2) {
+     vector< tinyEdge >::iterator ee = G.findEdgeInList( edgesAdded[ i ], edgesAdded[ i + 1 ] );
+     t_elapsed += G.dart_remove_edge( edgesAdded[i], ee );
+   }
+   
+   return t_elapsed;
 }
 
 /*

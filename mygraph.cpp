@@ -1836,13 +1836,19 @@ namespace mygraph {
     }
   };
 
-  /*
-   * Required: from < to
-   */
   class smEdge {
   public:
     node_id from;
     node_id to;
+
+    smEdge() {
+
+    }
+    
+    smEdge( const smEdge& rhs ) {
+      from = rhs.from;
+      to = rhs.to;
+    }
   };
 
   struct smEdge_hash {
@@ -2236,9 +2242,31 @@ namespace mygraph {
     uint32_t n2;
     uint32_t n3;
 
+    tinyTriangle() {}
+    
     tinyTriangle( uint32_t n2_in, uint32_t n3_in ) {
       n2 = n2_in;
       n3 = n3_in;
+    }
+
+    bool contains( uint32_t& test, uint32_t& other ) {
+      if ( n2 == test ) {
+	other = n3;
+	return true;
+      }
+      if (n3 == test ) {
+	other = n2;
+	return true;
+      }
+
+      return false;
+    }
+
+    tinyTriangle& operator= (const tinyTriangle& rhs) {
+      n2 = rhs.n2;
+      n3 = rhs.n3;
+
+      return *this;
     }
   };
    
@@ -2270,11 +2298,64 @@ namespace mygraph {
       adjList.assign(n, emptyNode);
     }
 
-    void add_edge( unsigned from, unsigned to ) {
+    void add_edge_immediate( unsigned from, unsigned to ) {
       tinyEdge FT( to, adjList[to].neis.size() );
       tinyEdge TF( from, adjList[from].neis.size() );
       adjList[ from ].neis.push_back( FT );
       adjList[ to ].neis.push_back( TF );
+    }
+
+    bool add_edge_half( node_id from, node_id to, vector< tinyEdge >::iterator& edgeAdded ) {
+      if (from == to)
+	return false;
+      
+      vector< tinyEdge >& v1 = adjList[ from ].neis;
+
+      auto it = v1.begin();
+      while (it != v1.end()) {
+	if (it->getId() >= to)
+	  break;
+
+	++it;
+      }
+
+      tinyEdge newEdge;
+      newEdge.target = to;
+      
+      if (it != v1.end()) {
+	if (it->getId() == to)
+	  return false;
+	//The element should be inserted
+	edgeAdded = v1.insert( it, newEdge ); //O( max_deg )
+	return true;
+      } 
+
+      edgeAdded = v1.insert( it, newEdge );
+      return true;
+    }
+
+    bool remove_edge_half( node_id from, node_id to ) {
+      if (from == to)
+	return false;
+      
+      vector< tinyEdge >& v1 = adjList[ from ].neis;
+
+      auto it = v1.begin();
+      while (it != v1.end()) {
+	if (it->getId() >= to)
+	  break;
+
+	++it;
+      }
+
+      if (it != v1.end()) {
+	if (it->getId() == to) {
+	  v1.erase( it );
+	  return true;
+	}
+      } 
+
+      return false;
     }
 
     /*
@@ -2357,7 +2438,7 @@ namespace mygraph {
 	ifile.read( (char *) &from,  sizeof( unsigned ) );
 	ifile.read( (char *) &to,  sizeof( unsigned ) );
 
-	add_edge( from, to );
+	add_edge_immediate( from, to );
       }
       ifile.close();
 	 
@@ -2387,6 +2468,28 @@ namespace mygraph {
       it->setS();
     }
 
+    void unpruneInList( vector< tinyEdge >& l, node_id& v ) {
+      auto it = l.begin();
+	 
+      while (it->getId() != v)
+	++it;
+
+      it->setS();
+      it->unsetW();
+    }
+
+    vector< tinyEdge >::iterator clearInList( vector< tinyEdge >& l, node_id& v ) {
+      auto it = l.begin();
+	 
+      while (it->getId() != v)
+	++it;
+
+      it->unsetS();
+      it->unsetW();
+
+      return it;
+    }
+    
     void pruneSInList( vector< tinyEdge >& l, node_id& v ) {
       auto it = l.begin();
 	 
@@ -2436,14 +2539,14 @@ namespace mygraph {
 
     bool find_disjoint_triangle( uint32_t s,
 				 tinyEdge& st,
-				 tinyEdge& sv,
-				 tinyEdge& tv,
+				 vector< tinyEdge >::iterator& sv,
+				 vector< tinyEdge >::iterator& tv,
 				 vector< smEdge >& unprunedEdges) {
       if (st.inS())
 	return false;
 
       vector< tinyEdge >& A_s = adjList[s].neis;
-      vector< tinyEdge >& A_t = adjList[ st.getId() ].neis; //know not in S or W
+      vector< tinyEdge >& A_t = adjList[ st.getId() ].neis; 
       auto it1 = A_s.begin();
       auto it2 = A_t.begin();
       if (it1 == A_s.end() || it2 == A_t.end() ) {
@@ -2467,6 +2570,7 @@ namespace mygraph {
 	    if ((*it1).inW()) {
 	      //unprune this edge
 	      (*it1).unsetW();
+	      unpruneInList( adjList[ (*it1).target ].neis, s );
 	      smEdge e_tmp;
 	      e_tmp.from = s;
 	      e_tmp.to = (*it1).target;
@@ -2476,16 +2580,18 @@ namespace mygraph {
 	      if ((*it2).inW()) {
 		//unprune this edge
 		(*it2).unsetW();
+		node_id t = st.getId();
+		unpruneInList( adjList[ (*it2).target ].neis, t );
 		smEdge e_tmp;
-		e_tmp.from = st.getId();
+		e_tmp.from = t;
 		e_tmp.to = (*it2).target;
 		unprunedEdges.push_back( e_tmp );		     
 		(*it2).setS();
 	      } else {
 		if ( !( (*it1).inS() || (*it2).inS() ) ) {
 		  //this triangle is disjoint from S
-		  sv = *it1;
-		  tv = *it2;
+		  sv = it1;
+		  tv = it2;
 		  return true;
 		}
 	      }
@@ -2502,36 +2608,107 @@ namespace mygraph {
       return false;
     }
 
-    void prune( vector< smEdge >& unprunedEdges ) {
+    tinyEdge* findEdgeInList( vector< tinyEdge >& v1, node_id target ) {
+      for (unsigned i = 0; i < v1.size(); ++i) {
+	if (v1[i].getId() == target)
+	  return &(v1[i]);
+      }
 
+      return 0; //Edge not found
     }
-     
-    void dart_add_edge( node_id s, tinyEdge& st ) {
-      tinyEdge& sv = st; //want references so edges in graph can be modified
-      tinyEdge& tv = st;
+
+    vector< tinyEdge >::iterator findEdgeInList( node_id source, node_id target ) {
+      vector< tinyEdge >& v1 = adjList[source].neis;
+      for (auto it = v1.begin();
+	   it != v1.end();
+	   ++it ) {
+	if (it->getId() == target)
+	  return it;
+      }
+
+      return v1.end(); //Edge not found
+    }
+    
+    void prune( smEdge& ee ) {
+      node_id& s = ee.from;
+      node_id& t = ee.to;
+      tinyEdge& st = *(findEdgeInList( adjList[ s ].neis, t ));
+      if (!st.inS())
+	return;
+      bool prunable = true;
+      vector< tinyEdge >& A_s = adjList[s].neis;
+      vector< tinyEdge >& A_t = adjList[t].neis; 
+      auto it1 = A_s.begin();
+      auto it2 = A_t.begin();
+      if (it1 == A_s.end() || it2 == A_t.end() ) {
+	return;
+      }
+      while (1) {
+	if (*it1 < *it2) {
+	  ++it1;
+	  if (it1 == A_s.end()) {
+	    break;
+	  }
+	} else {
+	  if (*it2 < *it1) {
+	    ++it2;
+	    if (it2 == A_t.end()) {
+	      break;
+	    }
+	  } else {
+	    //found a triangle
+	    if (prune_triangle( st, *it1, *it2, s)) {
+
+	    } else {
+	      //st must remain in S
+	      prunable = false;
+	      break;
+	    }
+			
+	    ++it1; 
+	    ++it2; 
+	    if (it1 == A_s.end() || it2 == A_t.end() )
+	      break;
+	  }
+	}
+      }
+      //prune if we can
+      if (prunable) {
+	st.unsetS();
+	st.setW();
+	pruneSInList( A_t, s );
+	//	    A_t[ st.matePairLoc ].unsetS();
+	//	    A_t[ st.matePairLoc ].setW();
+      }
+      
+    }
+    
+    void prune( vector< smEdge >& unprunedEdges ) {
+      for (auto it = unprunedEdges.begin();
+	   it != unprunedEdges.end();
+	   ++it ) {
+	prune( *it );
+      }
+    }
+
+    bool incident( node_id& s, node_id& t ) {
+      if ( findEdgeInList( adjList[ s ].neis, t ) != 0 )
+	return true;
+      else
+	return false;
+    }
+    
+    double dart_add_edge( node_id s, vector< tinyEdge >::iterator st ) {
+      clock_t t_start = clock();
+      
+      vector<tinyEdge>::iterator sv; //want references so edges in graph can be modified
+      vector<tinyEdge>::iterator tv;
 
       vector< smEdge > unprunedEdges;
-      if ( find_disjoint_triangle( s, st, sv, tv, unprunedEdges )) {
+      if ( find_disjoint_triangle( s, *st, sv, tv, unprunedEdges )) {
 	//Add this triangle to S
-	node_id& t = st.target;
-	node_id& v = sv.target;
-
-	tinyTriangle sT( t, v );
-	tinyTriangle tT( s, v );
-	tinyTriangle vT( s, t );
-	adjList[ s ].solutionTriangles.push_back (sT);
-	adjList[ t ].solutionTriangles.push_back (tT);
-	adjList[ v ].solutionTriangles.push_back (vT);
-	    
-	vector< tinyEdge >& At = adjList[ t ].neis;
-	vector< tinyEdge >& Av = adjList[ v ].neis;
-	setSInList( At, s );
-	setSInList( Av, s );
-	setSInList( Av, t );
-	    
-	st.setS();
-	sv.setS();
-	tv.setS();
+	node_id& t = st->target;
+	node_id& v = sv->target;
 
 	smEdge e_tmp;
 	e_tmp.from = s;
@@ -2541,10 +2718,82 @@ namespace mygraph {
 	unprunedEdges.push_back( e_tmp );
 	e_tmp.from = t;
 	unprunedEdges.push_back( e_tmp );
+	
+	tinyTriangle sT( t, v );
+	tinyTriangle tT( s, v );
+	tinyTriangle vT( s, t );
+	adjList[ s ].solutionTriangles.push_back (sT);
+	adjList[ t ].solutionTriangles.push_back (tT);
+	adjList[ v ].solutionTriangles.push_back (vT);
 	    
+	vector< tinyEdge >& At = adjList[ t ].neis;
+	vector< tinyEdge >& Av = adjList[ v ].neis;
+
+	setSInList( At, s );
+	setSInList( Av, s );
+	setSInList( Av, t );
+	    
+	st->setS();
+	sv->setS();
+	tv->setS();
+
+    
       }
 
       prune( unprunedEdges );
+      return double (clock() - t_start) / CLOCKS_PER_SEC;
+    }
+
+    bool remove_edge( node_id s, node_id t ) {
+      if ( remove_edge_half( s , t ) ) {
+	--m;
+	return remove_edge_half(t, s );
+      }
+
+      return false;
+    }
+
+    node_id eraseSolTriangle( node_id& s, node_id& t ) {
+      node_id v;
+
+      for (auto it = adjList[s].solutionTriangles.begin();
+	   it != adjList[s].solutionTriangles.end();
+	   ++it) {
+	if (it->contains( t, v )) {
+	  adjList[s].solutionTriangles.erase( it );
+	  return v;
+	  break;
+	}
+      }
+      
+      return bitS; //As failure value, no node id can be that big
+    }
+    
+    double dart_remove_edge( node_id s, vector< tinyEdge >::iterator st ) {
+      clock_t t_start = clock();
+      node_id t = st->getId();
+      if (st->inS() || st->inW() ) {
+	//remove the solution triangles
+	node_id v = eraseSolTriangle( s, t );
+	eraseSolTriangle( t, s );
+	eraseSolTriangle( s, v );
+	//remove (s,t)
+	remove_edge( s, t );
+
+	//Remove sv, tv from solution
+	vector< tinyEdge >::iterator sv = clearInList( adjList[ s ].neis, v );
+	clearInList( adjList[ v ].neis, s );
+	vector< tinyEdge >::iterator tv = clearInList( adjList[ t ].neis, v );
+	clearInList( adjList[ v ].neis, t );
+
+	dart_add_edge( s, sv );
+	dart_add_edge( t, tv );
+	
+      } else {
+	remove_edge( s, t );
+      }
+
+      return double (clock() - t_start) / CLOCKS_PER_SEC;
     }
       
     /*
