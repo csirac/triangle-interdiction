@@ -82,9 +82,14 @@ int main(int argc, char ** argv) {
   bool bRemove = false;
   unsigned mRemove;
   bool bAddRemove = false;
+  unsigned Nreps = 1;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:") ) != -1) {
     switch(c) {
+    case 'N':
+       s_arg.assign( optarg );
+       Nreps = stoi( s_arg );
+       break;
     case 'o':
        s_arg.assign( optarg );
        outfilename = s_arg;
@@ -152,307 +157,248 @@ int main(int argc, char ** argv) {
   }
 
   //  string outfile = "run-" + fname.substr(0, fname.find_last_of( '.' )) + "-" + to_string( time(0) ) + ".txt";
-  string outfile = "log" + to_string( time(0) ) + ".txt";
-  ofstream of( outfile.c_str() );
-  Graph G(DEBUG, of, true);
+  //  string outfile = "log" + to_string( time(0) ) + ".txt";
+  //  ofstream of( outfile.c_str() );
+  Graph G(DEBUG, cout);
 
-  ofstream ofile;
+  resultsHandler myResults;
+
+  for (unsigned iter = 0; iter < Nreps; ++iter) {
+     G.clear_graph();
   
-  if (bOut) {
-     ofile.open( outfilename.c_str(), ios::app );
-  }
-
-  if (bKortsarz || bOpt || bTarl || bDart) {
-     G.logg(INFO, "Reading graph...");
-     if (bBinaryFormat) {
-	G.read_edge_list_bin( fname );
-     } else {
-	G.read_edge_list( fname );
-     }
-     G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
-  }
-
-  double t_triangle = 0.0;
-  
-  if (bKortsarz || bTarl || bOpt ) {
-     G.logg(INFO, "Starting triangle-listing (single threaded)..." );
-     clock_t t_start = clock();
-     G.list_triangles();
-     double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-     G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) + " "  + to_string( t_elapsed ) );
-     //     G.logg(INFO, "Starting triangle-listing (multi-threaded)..." );
-     //     clock_t t_start = clock();
-     //     list_triangles_multi( G, nThreads );
-     //     double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-    
-     //     G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) + " "  + to_string( t_elapsed ) );
-     t_triangle = t_elapsed;
-  }
-  
-  if (bDart) {
-     G.logg( INFO, "Starting dart-base (first implementation)..." );
-     G.dart_base_free();
-     G.countS();
-     G.logg( INFO, "dart-base: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
-	     + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
-
-     if (bOut) {
-       outputFile( ofile,
-		   fname,
-		   "dart-base1",
-		   G.V.size(),
-		   G.E.size(),
-		   G.preprocessTime,
-		   G.sizeS,
-		   G.runningTime );
-     }
-     
-     G.logg(INFO, "Starting free_prune()...");
-
-     G.free_prune();
-     G.countS();
-     G.logg( INFO, "After pruning: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
-	     + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
-
-     if (bOut) {
-       outputFile( ofile,
-		   fname,
-		   "prune1",
-		   G.V.size(),
-		   G.E.size(),
-		   G.preprocessTime,
-		   G.sizeS,
-		   G.runningTime );
-     }
-     
-     if (bAdd) {
-	G.init_dynamic();
-	if( !G.verify_graph() ) {
-	   G.logg(ERROR, "Graph structure is incorrect." );
-	   exit(1);
+     if (bKortsarz || bOpt || bTarl || bDart) {
+	G.logg(INFO, "Reading graph...");
+	if (bBinaryFormat) {
+	   G.read_edge_list_bin( fname );
 	} else {
-	   G.logg(INFO, "Graph structure is correct." );
+	   G.read_edge_list( fname );
 	}
-	
-	G.logg(INFO, "Adding and removing edges...");
-	G.runningTime += randomAddAndRemoveEdges( G, mAdd );
-	G.countS();
-	G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(G.sizeS) + " " + to_string(G.runningTime) );
-
 	G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
-
-	G.logg(DEBUG, "Comprehensive feasibility check...");
-	G.T.clear();
-	G.init_static();
-	if( !G.verify_graph() ) {
-	   G.logg(ERROR, "Graph structure is incorrect." );
-	   exit(1);
-	} else {
-	   G.logg(INFO, "Graph structure is correct." );
-	}
-
-	G.list_triangles();
-	G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
-	if (G.ensure_feasibility()) {
-	   G.logg(DEBUG, "Dart_add has maintained feasibility...");
-	}  else {
-	   G.logg(ERROR, "Dart_add has violated feasibility.");
-	}
+	myResults.add( "GraphNodes", G.V.size() );
+	myResults.add( "GraphEdges", G.E.size() );
+	myResults.add( "GraphPreprocess", G.preprocessTime );
      }
 
-     G.clear_edges();
-  }
+     double t_triangle = 0.0;
+  
+     if (bKortsarz || bTarl || bOpt ) {
+	G.logg(INFO, "Starting triangle-listing (single threaded)..." );
+	clock_t t_start = clock();
+	G.list_triangles();
+	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) + " "  + to_string( t_elapsed ) );
+	//     G.logg(INFO, "Starting triangle-listing (multi-threaded)..." );
+	//     clock_t t_start = clock();
+	//     list_triangles_multi( G, nThreads );
+	//     double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+    
+	//     G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) + " "  + to_string( t_elapsed ) );
+	t_triangle = t_elapsed;
+	myResults.add( "Triangles", G.T.size() );
+	myResults.add( "TrianglesTime(s)", t_triangle );
+     }
+  
+     if (bDart) {
+	G.logg( INFO, "Starting dart-base (first implementation)..." );
+	G.dart_base_free();
+	G.countS();
+	G.logg( INFO, "dart-base: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
+		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
+	
+	myResults.add( "dart1Size", G.sizeS );
+	myResults.add( "dart1Time(s)", G.runningTime );
+	myResults.add( "dart1Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+     
+	G.logg(INFO, "Starting free_prune()...");
+
+	G.free_prune();
+	G.countS();
+	G.logg( INFO, "After pruning: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
+		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
+	
+	myResults.add( "prune1Size", G.sizeS );
+	myResults.add( "prune1Time(s)", G.runningTime );
+	myResults.add( "prune1Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+     
+	if (bAdd) {
+	   G.init_dynamic();
+	   if( !G.verify_graph() ) {
+	      G.logg(ERROR, "Graph structure is incorrect." );
+	      exit(1);
+	   } else {
+	      G.logg(INFO, "Graph structure is correct." );
+	   }
+	
+	   G.logg(INFO, "Adding and removing edges...");
+	   G.runningTime += randomAddAndRemoveEdges( G, mAdd );
+	   G.countS();
+	   G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(G.sizeS) + " " + to_string(G.runningTime) );
+
+	   G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
+
+	   G.logg(DEBUG, "Comprehensive feasibility check...");
+	   G.T.clear();
+	   G.init_static();
+	   if( !G.verify_graph() ) {
+	      G.logg(ERROR, "Graph structure is incorrect." );
+	      exit(1);
+	   } else {
+	      G.logg(INFO, "Graph structure is correct." );
+	   }
+
+	   G.list_triangles();
+	   G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
+	   if (G.ensure_feasibility()) {
+	      G.logg(DEBUG, "Dart_add has maintained feasibility...");
+	   }  else {
+	      G.logg(ERROR, "Dart_add has violated feasibility.");
+	   }
+	}
+
+	G.clear_edges();
+     }
   
 
-  if (bDart2) {
-     G.logg( INFO, "Reading graph into tinyGraph structure..." );
-     tinyGraph g;
-     if (bBinaryFormat) {
-	g.read_edge_list_bin( fname );
-     } else {
-	//	G.read_edge_list( fname );
-     }
-     G.logg( INFO, "Starting dart-base (second implementation)..." );
-     clock_t t_start = clock();
+     if (bDart2) {
+	G.logg( INFO, "Reading graph into tinyGraph structure..." );
+	tinyGraph g;
+	if (bBinaryFormat) {
+	   g.read_edge_list_bin( fname );
+	} else {
+	   //	G.read_edge_list( fname );
+	}
+	G.logg( INFO, "Starting dart-base (second implementation)..." );
+	clock_t t_start = clock();
 
-     size_t size = g.dart_base_free();
-     double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	size_t size = g.dart_base_free();
+	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
 
-     G.logg( INFO, "dart-base2: " + to_string(size) + " " +
-	     to_string(t_elapsed) + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
+	G.logg( INFO, "dart-base2: " + to_string(size) + " " +
+		to_string(t_elapsed) + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
 
-     if (bOut) {
-       outputFile( ofile,
-		   fname,
-		   "dart2",
-		   g.n ,
-		   g.m,
-		   g.preprocessTime,
-		   size,
-		   t_elapsed );
-     }
+	myResults.add( "dart2Size", size );
+	myResults.add( "dart2Time(s)", t_elapsed );
+	myResults.add( "dart2Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+	myResults.add( "tinyGraph,preprocess(s)", g.preprocessTime );
+	myResults.add( "tinyGraphNodes", g.n );
+	myResults.add( "tinyGraphEdges", g.m );
      
-     G.logg(INFO, "Starting free_prune()...");
-     t_start = clock();
-     g.free_prune();
-     t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-     size = g.countS();
-     G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed)
-	     + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
-
-     if (bOut) {
-       outputFile( ofile,
-		   fname,
-		   "prune2",
-		   g.n ,
-		   g.m,
-		   g.preprocessTime,
-		   size,
-		   t_elapsed );
-     }
-     
-     if (bAdd) {
-	G.logg(INFO, "Adding edges...");
-	t_elapsed += randomAddEdges( g, mAdd );
+	G.logg(INFO, "Starting free_prune()...");
+	t_start = clock();
+	g.free_prune();
+	t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
 	size = g.countS();
-	G.logg( INFO, "After adding " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+	G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed)
+		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
 
-	G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+	myResults.add( "prune2Size", size );
+	myResults.add( "prune2Time(s)", t_elapsed );
+	myResults.add( "prune2Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+
+	if (bAdd) {
+	   G.logg(INFO, "Adding edges...");
+	   t_elapsed += randomAddEdges( g, mAdd );
+	   size = g.countS();
+	   G.logg( INFO, "After adding " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+
+	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+	}
+
+	if (bAddRemove) {
+	   G.logg(INFO, "Adding and removing edges...");
+	   t_elapsed += randomAddAndRemoveEdges( g, mAdd );
+	   size = g.countS();
+	   G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+
+	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+	}
+
+	G.clear_edges();
      }
 
-     if (bAddRemove) {
-	G.logg(INFO, "Adding and removing edges...");
-	t_elapsed += randomAddAndRemoveEdges( g, mAdd );
-	size = g.countS();
-	G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+     if (bTarl) {
+	G.logg( INFO, "Starting TARL..." );
+	clock_t t_start = clock();
+	if (glpk_tarl( G, max_hours )) {
+	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	   unsigned size = G.countS();
+	   G.logg( INFO, "TARL: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
+	   if (G.ensure_feasibility())
+	      G.logg(INFO, "TARL solution is feasible.");
+	   else
+	      G.logg(WARN, "TARL solution is infeasible!");
 
-	G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+	   myResults.add( "tarlSize", size );
+	   myResults.add( "tarlTime(s)", t_elapsed + t_triangle);
+
+	} else {
+	   G.logg(INFO, "TARL (GLPK) exceeded time limit!");
+	   bTarl = false;
+	   myResults.set( "tarlSize", 0 );
+	   myResults.set( "tarlTime(s)", 0 );
+	}
+	G.clear_edges();
      }
 
-     G.clear_edges();
-  }
+     if (bKortsarz) {
+	G.logg( INFO, "Starting Kortsarz..." );
+	clock_t t_start = clock();
+	if (glpk_kortsarz( G, max_hours ) ) {
+	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	   unsigned size = G.countS();
+	   G.logg( INFO, "Kortsarz (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
 
-  if (bTarl) {
-     G.logg( INFO, "Starting TARL..." );
-     clock_t t_start = clock();
-     if (glpk_tarl( G, max_hours )) {
-	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	unsigned size = G.countS();
-	G.logg( INFO, "TARL: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-	if (G.ensure_feasibility())
-	   G.logg(INFO, "TARL solution is feasible.");
-	else
-	   G.logg(WARN, "TARL solution is infeasible!");
-
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "tarl",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      size,
-		      t_elapsed + t_triangle );
-
-	}
-     } else {
-	G.logg(INFO, "TARL (GLPK) exceeded time limit!");
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "tarl",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      0,
-		      0.0 );
-	}
-     }
-     G.clear_edges();
-  }
-
-  if (bKortsarz) {
-     G.logg( INFO, "Starting Kortsarz..." );
-     clock_t t_start = clock();
-     if (glpk_kortsarz( G, max_hours ) ) {
-	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	unsigned size = G.countS();
-	G.logg( INFO, "Kortsarz (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "kortsarz",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      size,
-		      t_elapsed + t_triangle );
-
-	}
+	   myResults.add( "kortsarzSize", size );
+	   myResults.add( "kortsarzTime(s)", t_elapsed + t_triangle);
 	
-	if (G.ensure_feasibility())
-	   G.logg(INFO, "Kortsarz solution is feasible.");
-	else
-	   G.logg(WARN, "Kortsarz solution is infeasible!");
-     } else {
-	G.logg(INFO, "Kortsarz (GLPK) exceeded time limit!");
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "kortsarz",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      0,
-		      0.0);
-
+	   if (G.ensure_feasibility())
+	      G.logg(INFO, "Kortsarz solution is feasible.");
+	   else
+	      G.logg(WARN, "Kortsarz solution is infeasible!");
+	} else {
+	   G.logg(INFO, "Kortsarz (GLPK) exceeded time limit!");
+	   bKortsarz = false;
+	   myResults.set( "kortsarzSize", 0 );
+	   myResults.set( "kortsarzTime(s)", 0 );
 	}
-     }
      
-     G.clear_edges();
-  }
-
-  if (bOpt) {
-     G.logg(INFO, "Starting GLPK IP solver..." );
-     clock_t t_start = clock();
-     GLPK_solver GLPK( G, max_hours );
-     vector< unsigned > vout;
-     if (GLPK.MIP_solve( G )) {
-	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	unsigned size = G.countS();
-
-	G.logg(INFO, "OPT (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "opt",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      size,
-		      t_elapsed + t_triangle );
-
-	}
-	
-     } else {
-	G.logg(INFO, "OPT (GLPK) exceeded time limit!");
-	if (bOut) {
-	  outputFile( ofile,
-		      fname,
-		      "opt",
-		      G.V.size(),
-		      G.E.size(),
-		      G.preprocessTime,
-		      0,
-		      0 );
-	}
+	G.clear_edges();
      }
 
-     G.clear_edges();
+     if (bOpt) {
+	G.logg(INFO, "Starting GLPK IP solver..." );
+	clock_t t_start = clock();
+	GLPK_solver GLPK( G, max_hours );
+	vector< unsigned > vout;
+	if (GLPK.MIP_solve( G )) {
+	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	   unsigned size = G.countS();
+
+	   G.logg(INFO, "OPT (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
+
+	   myResults.add( "optSize", size );
+	   myResults.add( "optTime(s)", t_elapsed + t_triangle);
+	   
+	} else {
+	   G.logg(INFO, "OPT (GLPK) exceeded time limit!");
+	   bOpt = false;
+
+	   myResults.set( "optSize", 0 );
+	   myResults.set( "optTime(s)", 0 );
+	}
+
+	G.clear_edges();
+     }
   }
 
-  of.close();
+  if (bOut) {
+     ofstream ofile;
+     ofile.open( outfilename.c_str(), ios::app );
+     myResults.print( ofile );
+     ofile.close();
+  }
+  myResults.print( cout );
+  
   return 0;
 }
 

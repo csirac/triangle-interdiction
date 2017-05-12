@@ -10,6 +10,8 @@
 #include <map>
 #include <unordered_set>
 #include <thread>
+#include <iomanip>
+#include <cmath>
 #include "logger.cpp"
 
 
@@ -337,6 +339,19 @@ namespace mygraph {
 	i->in_W = false;
       }
     }
+
+     void clear_graph() {
+	n = 0;
+	m = 0;
+	V.clear();
+	E.clear();
+	vE.clear();
+	T.clear();
+	Tsol.clear();
+	runningTime = 0.0;
+	preprocessTime = 0.0;
+	sizeS = 0;
+     }
      
     void init_empty_graph() {
       Node tmp;
@@ -3103,7 +3118,76 @@ namespace mygraph {
     }
   }
 
-}   
+   class resultsHandler {
+   public:
+      map< string, vector< double > > data;
+      
+      void add( string name, double val ) {
+	 data[ name ].push_back( val );
+      }
+
+      void set( string name, double val ) {
+	 data[ name ].assign(1, val);
+      }
+      
+      void print( ostream& os, bool printStdDev = false ) {
+	 //Print names
+	 os << '#';
+	 unsigned index = 1;
+	 for (auto it = data.begin();
+	      it != data.end();
+	      ++it ) {
+	    if (it->second.size() == 1) {
+	       os << to_string( index ) + it->first;
+	       ++index;
+	    } else {
+	       if (printStdDev) {
+		  os << (to_string(index) + it->first + "_mean");
+		  ++index;
+		  os << (to_string(index) + it->first + "_stddev");
+		  ++index;
+	       } else {
+		  os << to_string( index ) + it->first;
+		  ++index;
+	       }
+	    }
+	 }
+	 os << endl;
+	 os << fixed;
+	 double mean;
+	 double stddev;
+	 for (auto it = data.begin();
+	      it != data.end();
+	      ++it ) {
+	    //	    os << setprecision( 3 );
+	    if ((it->second).size() > 1) {
+	       //compute mean
+	       mean = 0;
+	       for (unsigned i = 0; i < (it->second).size(); ++i) {
+		  mean += (it->second)[i];
+	       }
+	       mean /= (it->second).size();
+
+	       os << setw(20) << mean;
+	       if (printStdDev) {
+		  //compute stddev
+		  stddev = 0;
+		  for (unsigned i = 0; i < (it->second).size(); ++i) {
+		     stddev += ((it->second)[i] - mean) * ((it->second)[i] - mean);
+		  }
+		  stddev /= ((it->second).size() - 1);
+		  stddev = sqrt( stddev );
+		  os << setw(20) << stddev;
+	       }
+	    } else {
+	       os << setw(20) << (it->second).front();
+	    }
+	 }
+	 os << endl;
+      }
+   };
+   
+}
 
 
 
