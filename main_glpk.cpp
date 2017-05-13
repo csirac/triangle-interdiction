@@ -42,6 +42,7 @@ void print_help() {
        << "-T [run TARL]" << endl
        << "-K [run 2-approx. of Kortsarz et al.]" << endl
        << "-O [run optimal solution via GNU GLPK]" << endl
+       << "-P [run primal-dual algorithm]" << endl
        << "-A <m_add> (run DART, then adaptively add <m_add> random edges to the network)" << endl
        << "-R <m_remove> (run DART, then adaptively remove <m_remove> random edges from the network)" << endl
        << "-S <m_addremove> (run DART, then adaptively add <m_addremove> random edges to the network, and then remove the same edges)" << endl
@@ -70,6 +71,7 @@ int main(int argc, char ** argv) {
   bool bDart = false;
   bool bDart2 = false;
   bool bTarl = false;
+  bool bPD = false;
   bool bBinaryFormat = false;
   
   string s_arg;
@@ -84,8 +86,11 @@ int main(int argc, char ** argv) {
   bool bAddRemove = false;
   unsigned Nreps = 1;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:P") ) != -1) {
     switch(c) {
+    case 'P':
+       bPD = true;
+       break;
     case 'N':
        s_arg.assign( optarg );
        Nreps = stoi( s_arg );
@@ -159,14 +164,14 @@ int main(int argc, char ** argv) {
   //  string outfile = "run-" + fname.substr(0, fname.find_last_of( '.' )) + "-" + to_string( time(0) ) + ".txt";
   //  string outfile = "log" + to_string( time(0) ) + ".txt";
   //  ofstream of( outfile.c_str() );
-  Graph G(DEBUG, cout);
+  Graph G(ERROR, cout);
 
   resultsHandler myResults;
 
   for (unsigned iter = 0; iter < Nreps; ++iter) {
      G.clear_graph();
   
-     if (bKortsarz || bOpt || bTarl || bDart) {
+     if (bKortsarz || bOpt || bTarl || bDart || bPD) {
 	G.logg(INFO, "Reading graph...");
 	if (bBinaryFormat) {
 	   G.read_edge_list_bin( fname );
@@ -181,7 +186,7 @@ int main(int argc, char ** argv) {
 
      double t_triangle = 0.0;
   
-     if (bKortsarz || bTarl || bOpt ) {
+     if (bKortsarz || bTarl || bOpt || bPD ) {
 	G.logg(INFO, "Starting triangle-listing (single threaded)..." );
 	clock_t t_start = clock();
 	G.list_triangles();
@@ -197,10 +202,18 @@ int main(int argc, char ** argv) {
 	myResults.add( "Triangles", G.T.size() );
 	myResults.add( "TrianglesTime(s)", t_triangle );
      }
-  
+
+     if (bPD) {
+	G.primal_dual();
+	myResults.add( "Primal-dual", G.sizeS );
+	myResults.add( "Primal-dual(time)", G.runningTime );
+	myResults.add( "Primal-dual(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+	G.clear_edges();
+     }
+     
      if (bDart) {
 	G.logg( INFO, "Starting dart-base (first implementation)..." );
-	G.dart_base_free();
+	G.dart_base();
 	G.countS();
 	G.logg( INFO, "dart-base: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
 		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
@@ -208,17 +221,6 @@ int main(int argc, char ** argv) {
 	myResults.add( "dart1Size", G.sizeS );
 	myResults.add( "dart1Time(s)", G.runningTime );
 	myResults.add( "dart1Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
-     
-	G.logg(INFO, "Starting free_prune()...");
-
-	G.free_prune();
-	G.countS();
-	G.logg( INFO, "After pruning: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
-		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
-	
-	myResults.add( "prune1Size", G.sizeS );
-	myResults.add( "prune1Time(s)", G.runningTime );
-	myResults.add( "prune1Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
      
 	if (bAdd) {
 	   G.init_dynamic();
@@ -269,31 +271,18 @@ int main(int argc, char ** argv) {
 	}
 	G.logg( INFO, "Starting dart-base (second implementation)..." );
 	clock_t t_start = clock();
-
-	size_t size = g.dart_base_free();
+	g.dart_base();
 	double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-
+	size_t size = g.countS();
 	G.logg( INFO, "dart-base2: " + to_string(size) + " " +
 		to_string(t_elapsed) + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
 
 	myResults.add( "dart2Size", size );
 	myResults.add( "dart2Time(s)", t_elapsed );
 	myResults.add( "dart2Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
-	myResults.add( "tinyGraph,preprocess(s)", g.preprocessTime );
+	myResults.add( "tinyGraphPro(s)", g.preprocessTime );
 	myResults.add( "tinyGraphNodes", g.n );
 	myResults.add( "tinyGraphEdges", g.m );
-     
-	G.logg(INFO, "Starting free_prune()...");
-	t_start = clock();
-	g.free_prune();
-	t_elapsed = t_elapsed + double (clock() - t_start) / CLOCKS_PER_SEC;
-	size = g.countS();
-	G.logg( INFO, "After pruning: " + to_string(size) + " " + to_string(t_elapsed)
-		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
-
-	myResults.add( "prune2Size", size );
-	myResults.add( "prune2Time(s)", t_elapsed );
-	myResults.add( "prune2Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
 
 	if (bAdd) {
 	   G.logg(INFO, "Adding edges...");
@@ -397,7 +386,7 @@ int main(int argc, char ** argv) {
      myResults.print( ofile );
      ofile.close();
   }
-  myResults.print( cout );
+  //  myResults.print( cout );
   
   return 0;
 }

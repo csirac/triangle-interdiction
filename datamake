@@ -1,0 +1,22 @@
+all: gnut fb hepth grqc
+grqc:
+	grec -G GrQc/ca-GrQc.txt -P -o results_GrQc.txt -N 10
+	grec -G GrQc/ca-GrQc.txt -D -o results_GrQc.txt -N 10
+	grec -G GrQc/ca-GrQc.txt -T -o results_GrQc.txt -N 10
+	grec -G GrQc/ca-GrQc.txt -K -o results_GrQc.txt -N 10
+fb:
+	grec -G facebook/facebook.txt -P -o results_facebook.txt -N 10
+	grec -G facebook/facebook.txt -D -o results_facebook.txt -N 10
+	grec -G facebook/facebook.txt -T -o results_facebook.txt -N 10
+	grec -G facebook/facebook.txt -K -o results_facebook.txt -N 10
+gnut:
+	grec -G gnutella/p2p-Gnutella08.txt -P -o results_gnutella.txt -N 10 
+	grec -G gnutella/p2p-Gnutella08.txt -D -o results_gnutella.txt -N 10 
+	grec -G gnutella/p2p-Gnutella08.txt -T -o results_gnutella.txt -N 10
+	grec -G gnutella/p2p-Gnutella08.txt -K -o results_gnutella.txt -N 10
+	grec -G gnutella/p2p-Gnutella08.txt -O -o results_gnutella.txt -N 10 
+hepth:
+	grec -G HepTh/ca-HepTh.txt -P -o results_HepTh.txt -N 10
+	grec -G HepTh/ca-HepTh.txt -D -o results_HepTh.txt -N 10
+	grec -G HepTh/ca-HepTh.txt -T -o results_HepTh.txt -N 10
+	grec -G HepTh/ca-HepTh.txt -K -o results_HepTh.txt -N 10

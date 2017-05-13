@@ -276,6 +276,7 @@ namespace mygraph {
     Logger logg;
     unsigned sizeS;
     double runningTime;
+     double tTriangles;
     double preprocessTime;
     
     void save( ostream& os ) {
@@ -576,6 +577,7 @@ namespace mygraph {
     }
       
     void list_triangles() {
+       clock_t t_start = clock();
       vector < vector< node_id > > A( n, vector< node_id >() );
       vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
       size_t count = 0;
@@ -627,6 +629,7 @@ namespace mygraph {
 	  }
 	}
       }
+      tTriangles = double (clock() - t_start) / CLOCKS_PER_SEC;
       logg( INFO, to_string(count) + " triangles found.");
     }
 
@@ -647,10 +650,12 @@ namespace mygraph {
     }
      
     /*
-     * DART-BASE (original version)
+     * Primal-dual algorithm
      */
-    unsigned dart_base() {
-      logg(INFO, "Beginning DART_BASE...");
+    unsigned primal_dual() {
+      logg(INFO, "Beginning primal-dual...");
+      runningTime = 0.0;
+      clock_t t_start = clock();
       unsigned size_S = 0;
 
       for (pangle it = T.begin();
@@ -661,9 +666,10 @@ namespace mygraph {
 	  size_S += 3;
 	}
       }
-
-      logg(INFO, "DART_BASE finished, size of S: " + to_string(size_S));
-
+      this->runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+      logg(INFO, "primal-dual finished, size of S: " + to_string(size_S));
+      this->sizeS = size_S;
+      this->runningTime += tTriangles;
       return size_S;
     }
 
@@ -981,9 +987,9 @@ namespace mygraph {
     }
       
     /*
-     * DART-BASE (no triangle listing)
+     * DART-BASE 
      */
-    unsigned dart_base_free() {
+    unsigned dart_base() {
       clock_t t_start = clock();
       vector < vector< node_id > > A( n, vector< node_id >() );
       vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
@@ -1037,8 +1043,11 @@ namespace mygraph {
 	  }
 	}
       }
+      
+      free_prune();
+      
       runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
-      logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
+      logg(INFO, "DART_BASE finished, size of S: " + to_string(countS));
 
       return countS;
     }
@@ -1207,18 +1216,6 @@ namespace mygraph {
     }
       
     void free_prune() {
-      //	 vector < vector< node_id > > A( n, vector< node_id >() );
-      //	 vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
-      // vector < bool > prunability( E.size(), false );
-      // unsigned eid = 0;
-      // for (auto ee = E.begin(); ee != E.end(); ++ee ) {
-      //    if (ee->in_S)
-      //       prunability[ eid ] = true;
-      //    ++eid;
-      // }
-      //	 for (node_id s = 0; s < n; ++s ) {
-      //	    for (size_t j = 0; j < V[s].v_nei_ids.size(); ++j) {
-
       logg(DEBUG, "Starting free_prune()");
       clock_t t_start = clock();
       size_t prune_count = 0;
@@ -1281,25 +1278,6 @@ namespace mygraph {
       logg( DEBUG, "free-prune examined " + to_string(prune_count) + " triangles");
       return;
     }
-
-    // void free_prune_old() {
-    // 	 for (auto e = E.begin();
-    // 	      e != E.end();
-    // 	      ++e) {
-    // 	    if (e->in_S) {
-    // 	       //	       e->in_S = free_prune_process( e );
-    // 	       e->in_S = false;
-    // 	       if (!( e->T_e->e1->in_S || e->T_e->e2->in_S || e->T_e->e3->in_S)) {
-    // 	       	  e->in_S = true;
-    // 	       	  continue;
-    // 	       }
-    // 	       if (free_prune_process( e )) {
-    // 	       	  e->in_S = true;
-		  
-    // 	       } 	   
-    // 	    }
-    // 	 }
-    // }
 
     /*
      * DART-BASE
@@ -2457,9 +2435,7 @@ namespace mygraph {
       }
       ifile.close();
 	 
-      logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
-
-      logg(INFO, "Sorting neighbor lists..." );
+      //      logg(INFO, "Sorting neighbor lists..." );
       clock_t t_start = clock();
       for (unsigned i = 0; i < n; ++i) {
 	//	    adjList[i].sort( tinyEdgeCompare );
@@ -2471,6 +2447,7 @@ namespace mygraph {
 	//	  (adjList[ target  ].neis[ mp ]).matePairLoc = j;
 	//}
       }
+      preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
       return double (clock() - t_start) / CLOCKS_PER_SEC;
     }
 
@@ -2814,8 +2791,7 @@ namespace mygraph {
     /*
      * DART-BASE (no triangle listing)
      */
-    unsigned dart_base_free() {
-      unsigned countS = 0;
+    void dart_base() {
       for (node_id s = 0; s < n; ++s ) {
 	for (auto it0 = adjList[s].neis.begin();
 	     it0 != adjList[s].neis.end();
@@ -2847,8 +2823,6 @@ namespace mygraph {
 	      } else {
 		//found a triangle
 		if (free_triangle( st, *it1, *it2, s)) {
-		  countS += 3;
-		  //			      cerr << "(s, t, v) " << s << ' ' << st.getId() << ' ' (*it1).getId();
 		  unsigned t = st.getId();
 		  unsigned v = (*it1).getId();
 			      
@@ -2873,9 +2847,8 @@ namespace mygraph {
 	  }
 	}
       }
-      logg(INFO, "DART_BASE_FREE finished, size of S: " + to_string(countS));
 
-      return countS;
+      free_prune();
     }
 
     void free_prune() {
@@ -3137,6 +3110,8 @@ namespace mygraph {
 	 for (auto it = data.begin();
 	      it != data.end();
 	      ++it ) {
+	    os << setw(20);
+		 
 	    if (it->second.size() == 1) {
 	       os << to_string( index ) + it->first;
 	       ++index;
