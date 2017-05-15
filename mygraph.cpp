@@ -66,6 +66,9 @@ void apply_permutation_in_place(
 
 namespace mygraph {
 
+   random_device rd;
+   mt19937 gen( rd() );
+  
   typedef unsigned node_id;
   bool mycompare( const node_id& a, const node_id& b ) {
     return a < b;
@@ -575,6 +578,21 @@ namespace mygraph {
       vt->Delta.push_back( tt );
       st->Delta.push_back( tt );
     }
+
+    void add_triangle_no_delta(node_id& v, size_t& v_s, size_t& v_t, size_t& s_t,
+		      node_id& s, node_id& t ) {
+      //get edges (v,s), (v,t), (s,t)
+      pedge& vs = V[ v ].v_neighbors[ v_s ];
+      pedge& vt = V[ v ].v_neighbors[ v_t ];
+      pedge& st = V[ s ].v_neighbors[ s_t ];
+
+      Triangle T_out;
+      T_out.e1 = vs;
+      T_out.e2 = vt;
+      T_out.e3 = st;
+
+      T.push_front(T_out);
+    }
       
     void list_triangles() {
        clock_t t_start = clock();
@@ -633,6 +651,64 @@ namespace mygraph {
       logg( INFO, to_string(count) + " triangles found.");
     }
 
+    void list_triangles_pd() {
+      T.clear();
+      clock_t t_start = clock();
+      vector < vector< node_id > > A( n, vector< node_id >() );
+      vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
+      size_t count = 0;
+	 
+      for (node_id s = 0; s < n; ++s ) {
+	for (size_t j = 0; j < V[s].v_nei_ids.size(); ++j) {
+	  node_id& t = V[s].v_nei_ids[ j ];
+	  if (s < t) {
+	    vector< node_id >& A_s = A[s];
+	    vector< node_id >& A_t = A[t];
+	    vector< size_t >& I_s = I[s];
+	    vector< size_t >& I_t = I[t];
+	    auto it1 = A_s.begin();
+	    auto it2 = A_t.begin();
+	    if (it1 == A_s.end() || it2 == A_t.end() ) {
+	      A_t.push_back( s );
+	      I_t.push_back( j );
+	      continue;
+	    }
+	    auto it3 = I_s.begin();
+	    auto it4 = I_t.begin();
+	    while (1) {
+	      if (*it1 < *it2) {
+		++it1;
+		++it3;
+		if (it1 == A_s.end()) {
+		  break;
+		}
+	      } else {
+		if (*it2 < *it1) {
+		  ++it2;
+		  ++it4;
+		  if (it2 == A_t.end()) {
+		    break;
+		  }
+		} else {
+		  //found a triangle
+		  add_triangle_no_delta( *it1, *it3, *it4, j, s, t);
+		  ++count;
+		  ++it1; ++it3;
+		  ++it2; ++it4;
+		  if (it1 == A_s.end() || it2 == A_t.end() )
+		    break;
+		}
+	      }
+	    }
+	    A_t.push_back( s );
+	    I_t.push_back( j );
+	  }
+	}
+      }
+      tTriangles = double (clock() - t_start) / CLOCKS_PER_SEC;
+      logg( INFO, to_string(count) + " triangles found.");
+    }
+
     void check_triangles(){
       for (auto t = T.begin();
 	   t != T.end();
@@ -654,6 +730,9 @@ namespace mygraph {
      */
     unsigned primal_dual() {
       logg(INFO, "Beginning primal-dual...");
+      if (T.size() == 0)
+	list_triangles_pd();
+      
       runningTime = 0.0;
       clock_t t_start = clock();
       unsigned size_S = 0;
@@ -1688,6 +1767,30 @@ namespace mygraph {
       return true;
     }
 
+    void genER( unsigned erN, double erP ) {
+      logg(INFO, "Generating ER graph, n = " + to_string(erN) + ", p = " + to_string(erP));
+      this->n = erN;
+      init_empty_graph();
+      uniform_real_distribution< double > urd1 (0.0, 1.0);
+      for (unsigned i = 0; i < this->n; ++i) {
+	for (unsigned j = i + 1 ; j < this->n; ++j) {
+	  if (urd1( gen ) <= erP) {
+	    add_edge( i, j );
+	  }
+	}
+      }
+
+      logg(INFO, "Graph constructed: n = " + to_string(n) + ", m = " + to_string(m));
+      logg(INFO, "Sorting neighbor ids..." );
+      clock_t t_start = clock();
+      for ( auto v = V.begin(); v != V.end(); ++v ) {
+	auto p = sort_permutation( v->v_nei_ids, mycompare );
+	apply_permutation_in_place( v->v_nei_ids, p );
+	apply_permutation_in_place( v->v_neighbors, p );
+      }
+      preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+    }
+    
     void read_edge_list_bin( string fname ) {
       ifstream ifile ( fname.c_str(), ios::in | ios::binary );
       unsigned m; //number of edges in list
@@ -3093,75 +3196,111 @@ namespace mygraph {
 
    class resultsHandler {
    public:
-      map< string, vector< double > > data;
+      map< string, string > data;
       
-      void add( string name, double val ) {
-	 data[ name ].push_back( val );
+      void add( string name, string val ) {
+	 data[ name ] = val;
       }
+
+      void set( string name, string val ) {
+	data[ name ] = val;
+      }
+
+     void add( string name, double val ) {
+       string sval = to_string( val );
+       data[ name ] = sval;
+     }
 
       void set( string name, double val ) {
-	 data[ name ].assign(1, val);
+	string sval = to_string( val );
+	data[ name ] = sval;
       }
       
-      void print( ostream& os, bool printStdDev = false ) {
-	 //Print names
-	 os << '#';
-	 unsigned index = 1;
-	 for (auto it = data.begin();
-	      it != data.end();
-	      ++it ) {
-	    os << setw(20);
+      // void print( ostream& os, bool printStdDev = false ) {
+      // 	 //Print names
+      // 	 os << '#';
+      // 	 unsigned index = 1;
+      // 	 for (auto it = data.begin();
+      // 	      it != data.end();
+      // 	      ++it ) {
+      // 	    os << setw(25);
 		 
-	    if (it->second.size() == 1) {
-	       os << to_string( index ) + it->first;
-	       ++index;
-	    } else {
-	       if (printStdDev) {
-		  os << (to_string(index) + it->first + "_mean");
-		  ++index;
-		  os << (to_string(index) + it->first + "_stddev");
-		  ++index;
-	       } else {
-		  os << to_string( index ) + it->first;
-		  ++index;
-	       }
-	    }
-	 }
-	 os << endl;
-	 os << fixed;
-	 double mean;
-	 double stddev;
-	 for (auto it = data.begin();
-	      it != data.end();
-	      ++it ) {
-	    //	    os << setprecision( 3 );
-	    if ((it->second).size() > 1) {
-	       //compute mean
-	       mean = 0;
-	       for (unsigned i = 0; i < (it->second).size(); ++i) {
-		  mean += (it->second)[i];
-	       }
-	       mean /= (it->second).size();
+      // 	    if (it->second.size() == 1) {
+      // 	       os << to_string( index ) + it->first;
+      // 	       ++index;
+      // 	    } else {
+      // 	       if (printStdDev) {
+      // 		  os << (to_string(index) + it->first + "_m");
+      // 		  ++index;
+      // 		  os << setw(25);
+      // 		  os << (to_string(index) + it->first + "_s");
+      // 		  ++index;
+      // 	       } else {
+      // 		  os << to_string( index ) + it->first;
+      // 		  ++index;
+      // 	       }
+      // 	    }
+      // 	 }
+      // 	 os << endl;
+      // 	 os << fixed;
+      // 	 double mean;
+      // 	 double stddev;
+      // 	 for (auto it = data.begin();
+      // 	      it != data.end();
+      // 	      ++it ) {
+      // 	    //	    os << setprecision( 3 );
+      // 	    if ((it->second).size() > 1) {
+      // 	       //compute mean
+      // 	       mean = 0;
+      // 	       for (unsigned i = 0; i < (it->second).size(); ++i) {
+      // 		  mean += (it->second)[i];
+      // 	       }
+      // 	       mean /= (it->second).size();
 
-	       os << setw(20) << mean;
-	       if (printStdDev) {
-		  //compute stddev
-		  stddev = 0;
-		  for (unsigned i = 0; i < (it->second).size(); ++i) {
-		     stddev += ((it->second)[i] - mean) * ((it->second)[i] - mean);
-		  }
-		  stddev /= ((it->second).size() - 1);
-		  stddev = sqrt( stddev );
-		  os << setw(20) << stddev;
-	       }
-	    } else {
-	       os << setw(20) << (it->second).front();
-	    }
-	 }
-	 os << endl;
-      }
-   };
+      // 	       os << setw(25) << mean;
+      // 	       if (printStdDev) {
+      // 		  //compute stddev
+      // 		  stddev = 0;
+      // 		  for (unsigned i = 0; i < (it->second).size(); ++i) {
+      // 		     stddev += ((it->second)[i] - mean) * ((it->second)[i] - mean);
+      // 		  }
+      // 		  stddev /= ((it->second).size() - 1);
+      // 		  stddev = sqrt( stddev );
+      // 		  os << setw(25) << stddev;
+      // 	       }
+      // 	    } else {
+      // 	       os << setw(25) << (it->second).front();
+      // 	    }
+      // 	 }
+      // 	 os << endl;
+      // }
+
+     void print_xml( ostream& os ) {
+       //os << "<?xml version = "1.0" encoding="UTF-8"?>" << endl;
+       os << "<result>" << endl;
+       for (auto it = data.begin();
+	    it != data.end();
+	    ++it) {
+	 os << "\t<" << it->first << ">";
+	 os << it->second;
+	 os << "</" << it->first << ">" << endl;
+       }
+       os << "</result>" << endl;
+     }
    
+   };
+
+  class algResult {
+  public:
+    string algName;
+    string graphName;
+    unsigned n;
+    unsigned m;
+    double p;
+    double preprocess;
+    
+  };
+  
 }
 
 

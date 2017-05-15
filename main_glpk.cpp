@@ -85,6 +85,8 @@ int main(int argc, char ** argv) {
   unsigned mRemove;
   bool bAddRemove = false;
   unsigned Nreps = 1;
+  unsigned erN = 0;
+  double erP;
   
   while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:P") ) != -1) {
     switch(c) {
@@ -118,6 +120,7 @@ int main(int argc, char ** argv) {
     case 'G':
       //graph specification
       fname.assign( optarg );
+      
       break;
     case 'g':
       //graph specification
@@ -159,34 +162,51 @@ int main(int argc, char ** argv) {
      print_help();
      cerr << "Input graph is required.\n";
      return 1;
+  } else {
+    if (fname.substr(0, 2) == "ER") {
+      size_t pos_colon = fname.find_first_of( ':' );
+      string s_n = fname.substr(2, (pos_colon - 2));
+      string s_p = fname.substr( pos_colon + 1 );
+      erP = stod( s_p );
+      erN = stoi( s_n );
+    }
   }
 
   //  string outfile = "run-" + fname.substr(0, fname.find_last_of( '.' )) + "-" + to_string( time(0) ) + ".txt";
   //  string outfile = "log" + to_string( time(0) ) + ".txt";
   //  ofstream of( outfile.c_str() );
-  Graph G(ERROR, cout);
+  Graph G(INFO, cout);
 
   resultsHandler myResults;
 
   for (unsigned iter = 0; iter < Nreps; ++iter) {
      G.clear_graph();
-  
+     myResults.data.clear();
+     
      if (bKortsarz || bOpt || bTarl || bDart || bPD) {
 	G.logg(INFO, "Reading graph...");
 	if (bBinaryFormat) {
 	   G.read_edge_list_bin( fname );
 	} else {
-	   G.read_edge_list( fname );
+	  if (erN > 0) {
+	    //generate ER graph
+	    G.genER( erN, erP );
+	    myResults.add( "erP", erP );
+	  } else {
+	    G.read_edge_list( fname );
+	  }
 	}
+	
 	G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
 	myResults.add( "GraphNodes", G.V.size() );
 	myResults.add( "GraphEdges", G.E.size() );
 	myResults.add( "GraphPreprocess", G.preprocessTime );
+	myResults.add( "GraphName", fname );
      }
 
      double t_triangle = 0.0;
   
-     if (bKortsarz || bTarl || bOpt || bPD ) {
+     if (bKortsarz || bTarl || bOpt ) {
 	G.logg(INFO, "Starting triangle-listing (single threaded)..." );
 	clock_t t_start = clock();
 	G.list_triangles();
@@ -199,15 +219,15 @@ int main(int argc, char ** argv) {
     
 	//     G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) + " "  + to_string( t_elapsed ) );
 	t_triangle = t_elapsed;
-	myResults.add( "Triangles", G.T.size() );
-	myResults.add( "TrianglesTime(s)", t_triangle );
+	myResults.add( "TriangleSize", G.T.size() );
+	myResults.add( "TriangleTime", t_triangle );
      }
 
      if (bPD) {
 	G.primal_dual();
-	myResults.add( "Primal-dual", G.sizeS );
-	myResults.add( "Primal-dual(time)", G.runningTime );
-	myResults.add( "Primal-dual(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+	myResults.add( "PrimalDualSize", G.sizeS );
+	myResults.add( "PrimalDualTime", G.runningTime );
+	myResults.add( "PrimalDualMem" , getPeakRSS() / (1024.0 * 1024.0));
 	G.clear_edges();
      }
      
@@ -218,9 +238,9 @@ int main(int argc, char ** argv) {
 	G.logg( INFO, "dart-base: " + to_string(G.sizeS) + " " + to_string(G.runningTime)
 		+ " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
 	
-	myResults.add( "dart1Size", G.sizeS );
-	myResults.add( "dart1Time(s)", G.runningTime );
-	myResults.add( "dart1Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
+	myResults.add( "Dart1Size", G.sizeS );
+	myResults.add( "Dart1Time", G.runningTime );
+	myResults.add( "Dart1Mem" , getPeakRSS() / (1024.0 * 1024.0));
      
 	if (bAdd) {
 	   G.init_dynamic();
@@ -277,10 +297,10 @@ int main(int argc, char ** argv) {
 	G.logg( INFO, "dart-base2: " + to_string(size) + " " +
 		to_string(t_elapsed) + " " + to_string( getPeakRSS() / (1024.0 * 1024.0)));
 
-	myResults.add( "dart2Size", size );
-	myResults.add( "dart2Time(s)", t_elapsed );
-	myResults.add( "dart2Mem(Mb)" , getPeakRSS() / (1024.0 * 1024.0));
-	myResults.add( "tinyGraphPro(s)", g.preprocessTime );
+	myResults.add( "Dart2Size", size );
+	myResults.add( "Dart2Time", t_elapsed );
+	myResults.add( "Dart2Mem" , getPeakRSS() / (1024.0 * 1024.0));
+	myResults.add( "tinyGraphPreprocess", g.preprocessTime );
 	myResults.add( "tinyGraphNodes", g.n );
 	myResults.add( "tinyGraphEdges", g.m );
 
@@ -317,14 +337,14 @@ int main(int argc, char ** argv) {
 	   else
 	      G.logg(WARN, "TARL solution is infeasible!");
 
-	   myResults.add( "tarlSize", size );
-	   myResults.add( "tarlTime(s)", t_elapsed + t_triangle);
+	   myResults.add( "TarlSize", size );
+	   myResults.add( "TarlTime", t_elapsed + t_triangle);
 
 	} else {
 	   G.logg(INFO, "TARL (GLPK) exceeded time limit!");
 	   bTarl = false;
-	   myResults.set( "tarlSize", 0 );
-	   myResults.set( "tarlTime(s)", 0 );
+	   myResults.set( "TarlSize", 0 );
+	   myResults.set( "TarlTime", 0 );
 	}
 	G.clear_edges();
      }
@@ -337,8 +357,8 @@ int main(int argc, char ** argv) {
 	   unsigned size = G.countS();
 	   G.logg( INFO, "Kortsarz (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
 
-	   myResults.add( "kortsarzSize", size );
-	   myResults.add( "kortsarzTime(s)", t_elapsed + t_triangle);
+	   myResults.add( "KortsarzSize", size );
+	   myResults.add( "KortsarzTime", t_elapsed + t_triangle);
 	
 	   if (G.ensure_feasibility())
 	      G.logg(INFO, "Kortsarz solution is feasible.");
@@ -347,8 +367,8 @@ int main(int argc, char ** argv) {
 	} else {
 	   G.logg(INFO, "Kortsarz (GLPK) exceeded time limit!");
 	   bKortsarz = false;
-	   myResults.set( "kortsarzSize", 0 );
-	   myResults.set( "kortsarzTime(s)", 0 );
+	   myResults.set( "KortsarzSize", 0 );
+	   myResults.set( "KortsarzTime", 0 );
 	}
      
 	G.clear_edges();
@@ -365,28 +385,31 @@ int main(int argc, char ** argv) {
 
 	   G.logg(INFO, "OPT (GLPK): " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));
 
-	   myResults.add( "optSize", size );
-	   myResults.add( "optTime(s)", t_elapsed + t_triangle);
+	   myResults.add( "OptSize", size );
+	   myResults.add( "OptTime", t_elapsed + t_triangle);
 	   
 	} else {
 	   G.logg(INFO, "OPT (GLPK) exceeded time limit!");
 	   bOpt = false;
 
-	   myResults.set( "optSize", 0 );
-	   myResults.set( "optTime(s)", 0 );
+	   myResults.set( "OptSize", 0 );
+	   myResults.set( "OptTime", 0 );
 	}
 
 	G.clear_edges();
      }
+
+     if (bOut) {
+       ofstream ofile;
+       ofile.open( outfilename.c_str(), ios::app );
+       myResults.print_xml( ofile );
+       ofile.close();
+     }
+     myResults.print_xml( cout );
   }
 
-  if (bOut) {
-     ofstream ofile;
-     ofile.open( outfilename.c_str(), ios::app );
-     myResults.print( ofile );
-     ofile.close();
-  }
-  //  myResults.print( cout );
+
+
   
   return 0;
 }
@@ -397,8 +420,6 @@ int main(int argc, char ** argv) {
  */
 
 double randomAddEdges( tinyGraph& G, unsigned mAdd) {
-   random_device rd;
-   mt19937 gen( rd() );
    uniform_int_distribution<> vdist(0, G.n - 1);
    double t_elapsed = 0.0;
    
@@ -506,3 +527,5 @@ double randomAddAndRemoveEdges( Graph& G, unsigned mAdd) {
    
    return t_elapsed;
 }
+
+		     
