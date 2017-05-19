@@ -8,10 +8,15 @@
 #include <random>
 #include "proc_size.cpp"
 
+enum Algo {DART1, DART2, OPT};
+
+void randomAddEdges( Graph& G,
+		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint);
 double randomAddEdges( Graph& G, unsigned mAdd);
 double randomAddEdges( tinyGraph& G, unsigned mAdd);
 double randomAddAndRemoveEdges( Graph& G, unsigned mAdd);
 double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd);
+
 
 void outputFile( ostream& os,
 		 string& fname,
@@ -204,6 +209,30 @@ int main(int argc, char ** argv) {
 	myResults.add( "GraphName", fname );
      }
 
+     if (bOut && bAdd) {
+	//Perform comprehensive dynamic addition of edges test
+	vector< Algo > A;
+	if (bOpt)
+	   A.push_back( OPT );
+	if (bDart)
+	   A.push_back( DART1 );
+	if (bDart2)
+	   A.push_back( DART2 );
+
+	for (unsigned iter = 0; iter < Nreps; ++iter) {
+	   ofstream ofile;
+	   ofile.open( outfilename.c_str(), ios::app );
+
+	   randomAddEdges( G, 
+			   mAdd, A, ofile, mAdd / 100 );
+     
+	   ofile.close();
+	}
+	
+	exit( 0 );
+     }
+
+     
      double t_triangle = 0.0;
   
      if (bKortsarz || bTarl || bOpt ) {
@@ -345,6 +374,7 @@ int main(int argc, char ** argv) {
 	   bTarl = false;
 	   myResults.set( "TarlSize", 0 );
 	   myResults.set( "TarlTime", 0 );
+	   return 1;
 	}
 	G.clear_edges();
      }
@@ -369,6 +399,7 @@ int main(int argc, char ** argv) {
 	   bKortsarz = false;
 	   myResults.set( "KortsarzSize", 0 );
 	   myResults.set( "KortsarzTime", 0 );
+	   return 1;
 	}
      
 	G.clear_edges();
@@ -394,6 +425,7 @@ int main(int argc, char ** argv) {
 
 	   myResults.set( "OptSize", 0 );
 	   myResults.set( "OptTime", 0 );
+	   return 1;
 	}
 
 	G.clear_edges();
@@ -414,11 +446,108 @@ int main(int argc, char ** argv) {
   return 0;
 }
 
+void outputResult( Graph& G, string algName, double time, ostream& os ) {
+   resultsHandler mr;
+   mr.add( algName + "Size", G.countS() );
+   mr.add( algName + "Time", time );
+   mr.add( "GraphNodes", G.V.size() );
+   mr.add( "GraphEdges", G.E.size() );
+   mr.add( "GraphPreprocess", G.preprocessTime );
+   mr.print_xml( os );
+}
+
+void outputResult( tinyGraph& G, string algName, double time, ostream& os ) {
+   resultsHandler mr;
+   mr.add( algName + "Size", G.countS() );
+   mr.add( algName + "Time", time );
+   mr.add( "GraphNodes", G.n );
+   mr.add( "GraphEdges", G.m );
+   mr.add( "GraphPreprocess", G.preprocessTime );
+   mr.print_xml( os );
+}
+
+void randomAddEdges( Graph& G_in,
+		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint = 1) {
+   Graph G( G_in );
+   //DartAdd, Dart2Add need an initial static run.
+   clock_t t_start = clock();
+   G.dart_base();
+   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+   outputResult( G, "Dart1Add", t_elapsed, os );
+
+   G.init_dynamic();
+   
+   tinyGraph g( G );
+   t_start = clock();
+   g.dart_base();
+   t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+
+   outputResult( g, "Dart2Add", t_elapsed, os );
+   //Begin edge addition procedure
+   uniform_int_distribution<> vdist(0, g.n - 1);
+   unsigned eAdded = 0;
+   while (eAdded < mAdd) {
+      node_id from = vdist( gen );
+      node_id to = vdist( gen );
+      vector< tinyEdge >::iterator e;
+      t_start = clock();
+      if ( g.add_edge_half( from, to, e ) ) {
+	 g.add_edge_half(to, from, e );
+	 g.m += 1;
+	 g.preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 t_start = clock();
+	 pedge f;
+	 G.dynamic_add_edge( from, to, f );
+         G.preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 //Run dynamic algorithms
+	 t_elapsed = G.dart_add_edge( from, to, f );
+	 outputResult( G, "Dart1Add", t_elapsed, os );
+	 t_elapsed = g.dart_add_edge( to, e );
+	 outputResult( g, "Dart2Add", t_elapsed, os );
+	 if ((eAdded + 1) % checkpoint == 0) {
+	    //Create static graphs
+	    Graph H( G );
+	    tinyGraph h( g );
+	 
+	    for (unsigned i = 0; i < A.size(); ++i) {
+	       switch( A[i] ) {
+	       case DART1:
+		  t_start = clock();
+		  H.dart_base();
+		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+		  outputResult( H, "Dart1", t_elapsed, os );
+		  break;
+
+	       case DART2:
+		  t_start = clock();
+		  h.dart_base();
+		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+		  outputResult( h, "Dart2", t_elapsed, os );
+		  break;
+
+	       case OPT:
+		  t_start = clock();
+		  H.clear_edges();
+		  H.list_triangles();
+		  GLPK_solver GLPK( H, 1 );
+		  GLPK.MIP_solve( H );
+		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+		  outputResult( H, "Opt", t_elapsed, os );
+		  H.clear_edges();
+		  break;
+	       }
+	    }	       
+	 }
+	 
+	 ++eAdded;
+      }
+   }
+}
+
 /*
  * Add random edges to G and update the Dart solution
  * Returns the total time elapsed
  */
-
 double randomAddEdges( tinyGraph& G, unsigned mAdd) {
    uniform_int_distribution<> vdist(0, G.n - 1);
    double t_elapsed = 0.0;
@@ -431,6 +560,7 @@ double randomAddEdges( tinyGraph& G, unsigned mAdd) {
       if ( G.add_edge_half( from, to, e ) ) {
 	G.add_edge_half(to, from, e );
 	G.m += 1;
+	
 	 t_elapsed += G.dart_add_edge( to, e );
 	 ++eAdded;
       }

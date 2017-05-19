@@ -285,15 +285,34 @@ namespace mygraph {
     void save( ostream& os ) {
 	 
     }
-      
+
+     Graph( const Graph& H ) {
+	n = H.n;
+	m = 0;
+	init_empty_graph();
+	for (auto it = H.E.begin();
+	     it != H.E.end();
+	     ++it) {
+	   add_edge(it->from, it->to);
+	}
+
+	clock_t t_start = clock();
+	for ( auto v = V.begin(); v != V.end(); ++v ) {
+	   auto p = sort_permutation( v->v_nei_ids, mycompare );
+	   apply_permutation_in_place( v->v_nei_ids, p );
+	   apply_permutation_in_place( v->v_neighbors, p );
+	}
+	preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+     }
+     
     Graph() {
       n = 0;
       m = 0;
     }
 
     Graph( LogType LT, ostream& os, bool echo = false) : logg( LT, os, echo ) {
-      n = 0;
-      m = 0;
+       n = 0;
+       m = 0;
     }
 
     //     Graph( const Graph& in ) : logg( in.logg.loglevel, in.logg.of ) {
@@ -2388,7 +2407,50 @@ namespace mygraph {
     Logger logg;
     vector< smTriangle > T_sol;
     double preprocessTime;
-    
+     tinyGraph() {
+	n = 0;
+	m = 0;
+     }
+
+     tinyGraph( const Graph& H ) {
+	n = H.V.size();
+	m = H.E.size();
+	init_empty_graph();
+	for (auto it = H.E.begin();
+	     it != H.E.end();
+	     ++it) {
+	   add_edge_immediate(it->from, it->to);
+	}
+
+	clock_t t_start = clock();
+	for (unsigned i = 0; i < n; ++i) {
+	   //	    adjList[i].sort( tinyEdgeCompare );
+	   sort( adjList[i].neis.begin(), adjList[i].neis.end(), tinyEdgeCompare );
+	   //update location of mate pairs
+	   //	for (unsigned j = 0; j < adjList[i].neis.size(); ++j) {
+	   //	  uint32_t& target = adjList[i].neis[ j ].target;
+	   //	  uint32_t& mp = adjList[i].neis[ j ].matePairLoc;
+	   //	  (adjList[ target  ].neis[ mp ]).matePairLoc = j;
+	   //}
+	}
+	preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
+     }
+     
+     tinyGraph( const tinyGraph& h ) {
+	adjList.assign( h.adjList.begin(), h.adjList.end() );
+	n = h.n;
+	m = h.m;
+	preprocessTime = h.preprocessTime;
+
+	for (size_t i = 0; i < adjList.size(); ++i) {
+	   adjList[i].solutionTriangles.clear();
+	   for (size_t j = 0; j < adjList[i].neis.size(); ++j) {
+	      adjList[i].neis[j].unsetS();
+	      adjList[i].neis[j].unsetW();
+	   }
+	}
+     }
+     
     void init_empty_graph() {
       tinyNode emptyNode;
       adjList.assign(n, emptyNode);
