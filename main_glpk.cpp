@@ -224,7 +224,7 @@ int main(int argc, char ** argv) {
 	   ofile.open( outfilename.c_str(), ios::app );
 
 	   randomAddEdges( G, 
-			   mAdd, A, ofile, mAdd / 100 );
+			   mAdd, A, ofile, mAdd / 10 );
      
 	   ofile.close();
 	}
@@ -456,9 +456,29 @@ void outputResult( Graph& G, string algName, double time, ostream& os ) {
    mr.print_xml( os );
 }
 
+void outputResult( Graph& G, string algName, unsigned solSize, double time, ostream& os ) {
+   resultsHandler mr;
+   mr.add( algName + "Size", solSize );
+   mr.add( algName + "Time", time );
+   mr.add( "GraphNodes", G.V.size() );
+   mr.add( "GraphEdges", G.E.size() );
+   mr.add( "GraphPreprocess", G.preprocessTime );
+   mr.print_xml( os );
+}
+
 void outputResult( tinyGraph& G, string algName, double time, ostream& os ) {
    resultsHandler mr;
    mr.add( algName + "Size", G.countS() );
+   mr.add( algName + "Time", time );
+   mr.add( "GraphNodes", G.n );
+   mr.add( "GraphEdges", G.m );
+   mr.add( "GraphPreprocess", G.preprocessTime );
+   mr.print_xml( os );
+}
+
+void outputResult( tinyGraph& G, string algName, unsigned solSize, double time, ostream& os ) {
+   resultsHandler mr;
+   mr.add( algName + "Size", solSize );
    mr.add( algName + "Time", time );
    mr.add( "GraphNodes", G.n );
    mr.add( "GraphEdges", G.m );
@@ -470,10 +490,12 @@ void randomAddEdges( Graph& G_in,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint = 1) {
    Graph G( G_in );
    //DartAdd, Dart2Add need an initial static run.
+   G_in.logg( INFO, "Starting initial static solutions..." );
    clock_t t_start = clock();
    G.dart_base();
    double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-   outputResult( G, "Dart1Add", t_elapsed, os );
+   unsigned solSize1 = G.countS();
+   outputResult( G, "Dart1Add", solSize1, t_elapsed, os );
 
    G.init_dynamic();
    
@@ -481,8 +503,8 @@ void randomAddEdges( Graph& G_in,
    t_start = clock();
    g.dart_base();
    t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-
-   outputResult( g, "Dart2Add", t_elapsed, os );
+   unsigned solSize2 = g.countS();
+   outputResult( g, "Dart2Add", solSize2, t_elapsed, os );
    //Begin edge addition procedure
    uniform_int_distribution<> vdist(0, g.n - 1);
    unsigned eAdded = 0;
@@ -500,11 +522,16 @@ void randomAddEdges( Graph& G_in,
 	 G.dynamic_add_edge( from, to, f );
          G.preprocessTime = double (clock() - t_start) / CLOCKS_PER_SEC;
 	 //Run dynamic algorithms
-	 t_elapsed = G.dart_add_edge( from, to, f );
-	 outputResult( G, "Dart1Add", t_elapsed, os );
-	 t_elapsed = g.dart_add_edge( to, e );
-	 outputResult( g, "Dart2Add", t_elapsed, os );
+	 t_start = clock();
+	 solSize1 += G.dart_add_edge( from, to, f );
+	 t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 outputResult( G, "Dart1Add", solSize1, t_elapsed, os );
+	 t_start = clock();
+	 solSize2 += g.dart_add_edge( to, e );
+	 t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 outputResult( g, "Dart2Add", solSize2, t_elapsed, os );
 	 if ((eAdded + 1) % checkpoint == 0) {
+	    G_in.logg( INFO, "Reached checkpoint..." );
 	    //Create static graphs
 	    Graph H( G );
 	    tinyGraph h( g );

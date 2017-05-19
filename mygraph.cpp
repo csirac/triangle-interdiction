@@ -971,10 +971,10 @@ namespace mygraph {
       
     /*
      * Update dart solution upon new edge
-     * Returns time to update solution
+     * Returns number of edges added to solution
      */
-    double dart_add_edge( node_id from, node_id to, pedge& e ) {
-      clock_t t_start = clock();
+    unsigned dart_add_edge( node_id from, node_id to, pedge& e ) {
+       unsigned solAdded = 0;
       //before proceeding, locally unprune the solution
       //	 local_unprune( from, to );
       //Find triangles containing e
@@ -993,10 +993,13 @@ namespace mygraph {
 	unprunedEdges.push_back( T_e.e1 );
 	unprunedEdges.push_back( T_e.e2 );
 	unprunedEdges.push_back( T_e.e3 );
+	solAdded += 3;
       }
 
-      prune( unprunedEdges );
-      return double (clock() - t_start) / CLOCKS_PER_SEC;
+      solAdded += unprunedEdges.size();
+      
+      solAdded -= prune( unprunedEdges );
+      return solAdded;
     }
 
     /*
@@ -1151,9 +1154,9 @@ namespace mygraph {
     }
 
 
-    void free_prune_process( pedge& it1 ) {
+    bool free_prune_process( pedge& it1 ) {
       if (!(it1->in_S))
-	return;
+	return false;
 	 
       node_id& from = it1->from;
       node_id& to = it1->to;
@@ -1170,12 +1173,12 @@ namespace mygraph {
       if (it2 == fend) {
 	it1->in_S = false;
 	it1->in_W = true;
-	return;
+	return true;
       }
       if (it3 == tend) {
 	it1->in_S = false;
 	it1->in_W = true;
-	return;
+	return true;
       }
       while (1) {
 	if ( (*it2)->other( from ) < (*it3)->other( to ) ) {
@@ -1193,7 +1196,7 @@ namespace mygraph {
 	      //this triangle needs edge it1 to be in the solution S
 	      it1->in_S = true;
 	      it1->in_W = false;
-	      return;
+	      return false;
 	    }
 
 	    ++it2;
@@ -1206,7 +1209,7 @@ namespace mygraph {
       //prune this edge
       it1->in_S = false;
       it1->in_W = true;
-      return;
+      return true;
     }
 
     void free_prune_process_faster( pedge& st ) {
@@ -1280,12 +1283,20 @@ namespace mygraph {
       }
     }
 
-    void prune( vector< pedge >& unprunedEdges ) {
+     /*
+      * Attempts to prune all edges in unprunedEdges
+      * Returns number of edges pruned
+      */
+    unsigned prune( vector< pedge >& unprunedEdges ) {
+       unsigned nPruned = 0;
       for (auto it = unprunedEdges.begin();
 	   it != unprunedEdges.end();
 	   ++it) {
-	free_prune_process( *it );
+	 if (free_prune_process( *it ))
+	    ++nPruned;
       }
+
+      return nPruned;
     }
       
     void local_unprune( node_id from, node_id to ) {
@@ -2786,19 +2797,19 @@ namespace mygraph {
       return v1.end(); //Edge not found
     }
     
-    void prune( smEdge& ee ) {
+    bool prune( smEdge& ee ) {
       node_id& s = ee.from;
       node_id& t = ee.to;
       tinyEdge& st = *(findEdgeInList( adjList[ s ].neis, t ));
       if (!st.inS())
-	return;
+	return false;
       bool prunable = true;
       vector< tinyEdge >& A_s = adjList[s].neis;
       vector< tinyEdge >& A_t = adjList[t].neis; 
       auto it1 = A_s.begin();
       auto it2 = A_t.begin();
       if (it1 == A_s.end() || it2 == A_t.end() ) {
-	return;
+	return true;
       }
       while (1) {
 	if (*it1 < *it2) {
@@ -2837,15 +2848,19 @@ namespace mygraph {
 	//	    A_t[ st.matePairLoc ].unsetS();
 	//	    A_t[ st.matePairLoc ].setW();
       }
-      
+
+      return prunable;
     }
     
-    void prune( vector< smEdge >& unprunedEdges ) {
+    unsigned prune( vector< smEdge >& unprunedEdges ) {
+       unsigned nPruned = 0;
       for (auto it = unprunedEdges.begin();
 	   it != unprunedEdges.end();
 	   ++it ) {
-	prune( *it );
+	 if (prune( *it ))
+	    ++nPruned;
       }
+      return nPruned;
     }
 
     bool incident( node_id& s, node_id& t ) {
@@ -2855,50 +2870,51 @@ namespace mygraph {
 	return false;
     }
     
-    double dart_add_edge( node_id s, vector< tinyEdge >::iterator st ) {
-      clock_t t_start = clock();
+    unsigned dart_add_edge( node_id s, vector< tinyEdge >::iterator st ) {
+       unsigned solAdded = 0;
       
-      vector<tinyEdge>::iterator sv; //want references so edges in graph can be modified
-      vector<tinyEdge>::iterator tv;
+       vector<tinyEdge>::iterator sv; //want references so edges in graph can be modified
+       vector<tinyEdge>::iterator tv;
 
-      vector< smEdge > unprunedEdges;
-      if ( find_disjoint_triangle( s, *st, sv, tv, unprunedEdges )) {
-	//Add this triangle to S
-	node_id& t = st->target;
-	node_id& v = sv->target;
+       vector< smEdge > unprunedEdges;
+       if ( find_disjoint_triangle( s, *st, sv, tv, unprunedEdges )) {
+	  //Add this triangle to S
+	  node_id& t = st->target;
+	  node_id& v = sv->target;
 
-	smEdge e_tmp;
-	e_tmp.from = s;
-	e_tmp.to = t;
-	unprunedEdges.push_back( e_tmp );
-	e_tmp.to = v;
-	unprunedEdges.push_back( e_tmp );
-	e_tmp.from = t;
-	unprunedEdges.push_back( e_tmp );
+	  smEdge e_tmp;
+	  e_tmp.from = s;
+	  e_tmp.to = t;
+	  unprunedEdges.push_back( e_tmp );
+	  e_tmp.to = v;
+	  unprunedEdges.push_back( e_tmp );
+	  e_tmp.from = t;
+	  unprunedEdges.push_back( e_tmp );
 	
-	tinyTriangle sT( t, v );
-	tinyTriangle tT( s, v );
-	tinyTriangle vT( s, t );
-	adjList[ s ].solutionTriangles.push_back (sT);
-	adjList[ t ].solutionTriangles.push_back (tT);
-	adjList[ v ].solutionTriangles.push_back (vT);
+	  tinyTriangle sT( t, v );
+	  tinyTriangle tT( s, v );
+	  tinyTriangle vT( s, t );
+	  adjList[ s ].solutionTriangles.push_back (sT);
+	  adjList[ t ].solutionTriangles.push_back (tT);
+	  adjList[ v ].solutionTriangles.push_back (vT);
 	    
-	vector< tinyEdge >& At = adjList[ t ].neis;
-	vector< tinyEdge >& Av = adjList[ v ].neis;
+	  vector< tinyEdge >& At = adjList[ t ].neis;
+	  vector< tinyEdge >& Av = adjList[ v ].neis;
 
-	setSInList( At, s );
-	setSInList( Av, s );
-	setSInList( Av, t );
+	  setSInList( At, s );
+	  setSInList( Av, s );
+	  setSInList( Av, t );
 	    
-	st->setS();
-	sv->setS();
-	tv->setS();
+	  st->setS();
+	  sv->setS();
+	  tv->setS();
 
-    
-      }
+	  solAdded += 3;
+       }
 
-      prune( unprunedEdges );
-      return double (clock() - t_start) / CLOCKS_PER_SEC;
+       solAdded += unprunedEdges.size();
+       solAdded -= prune( unprunedEdges );
+       return solAdded;
     }
 
     bool remove_edge( node_id s, node_id t ) {
