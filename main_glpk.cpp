@@ -12,7 +12,7 @@ enum Algo {DART1, DART2, OPT};
 
 void randomAddEdges( Graph& G,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint);
-double randomAddEdges( Graph& G, unsigned mAdd );
+void randomAddEdges( Graph& G, unsigned mAdd, double& graphUpdateTime, double& dart1AddTime);
 void randomAddEdges( tinyGraph& G, unsigned mAdd, double& , double& );
 double randomAddAndRemoveEdges( Graph& G, unsigned mAdd);
 double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd);
@@ -276,20 +276,20 @@ int main(int argc, char ** argv) {
      
 	if (bAdd) {
 	   G.init_dynamic();
-	   if( !G.verify_graph() ) {
-	      G.logg(ERROR, "Graph structure is incorrect." );
-	      exit(1);
-	   } else {
-	      G.logg(INFO, "Graph structure is correct." );
-	   }
-	
-	   G.logg(INFO, "Adding and removing edges...");
-	   G.runningTime += randomAddAndRemoveEdges( G, mAdd );
+	   G.logg(INFO, "Adding edges...");
+	   double GraphUpdateTime;
+	   double dart1AddTime;
+	   randomAddEdges( G, mAdd, GraphUpdateTime, dart1AddTime );
 	   G.countS();
-	   G.logg( INFO, "After adding and removing " +to_string(mAdd) + " edges, " + to_string(G.sizeS) + " " + to_string(G.runningTime) );
+	   G.logg( INFO, "After adding " +to_string(mAdd) + " edges, " + to_string(G.sizeS) + " " + to_string(G.runningTime) );
 
 	   G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
 
+	   myResults.add( "GraphUpdateTime", GraphUpdateTime );
+	   myResults.add( "Dart1AddTime", dart1AddTime );
+	   myResults.add( "Dart1AddSize", G.sizeS );
+	   myResults.add( "NumberAdded", mAdd );
+	   
 	   G.logg(DEBUG, "Comprehensive feasibility check...");
 	   G.T.clear();
 	   G.init_static();
@@ -346,8 +346,9 @@ int main(int argc, char ** argv) {
 
 	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
 
-	   myResults.add( "tinyGraphUpdate", tinyGraphUpdateTime );
+	   myResults.add( "tinyGraphUpdateTime", tinyGraphUpdateTime );
 	   myResults.add( "Dart2AddTime", dart2AddTime );
+	   myResults.add( "Dart2AddSize", size );
 	   myResults.add( "NumberAdded", mAdd );
 	}
 
@@ -644,26 +645,30 @@ double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd) {
 
 /*
  * Add random edges to G and update the Dart solution
- * Returns the total time elapsed
+ * Returns the total time elapsed of dart1, and total time to update Graph
  */
 
-double randomAddEdges( Graph& G, unsigned mAdd) {
+void randomAddEdges( Graph& G, unsigned mAdd, double& graphUpdateTime, double& dart1AddTime) {
    random_device rd;
    mt19937 gen( rd() );
    uniform_int_distribution<> vdist(0, G.V.size() - 1);
-   double t_elapsed = 0.0;
-   
+   clock_t t_start;
    unsigned eAdded = 0;
+   graphUpdateTime = 0.0;
+   dart1AddTime = 0.0;
    while (eAdded < mAdd) {
       node_id from = vdist( gen );
       node_id to = vdist( gen );
       pedge e;
+      t_start = clock();
       if ( G.dynamic_add_edge( from, to, e ) ) {
-	 t_elapsed += G.dart_add_edge( from, to, e );
+	 graphUpdateTime += double (clock() - t_start) / CLOCKS_PER_SEC;
+	 t_start = clock();
+	 G.dart_add_edge( from, to, e );
+	 dart1AddTime += double (clock() - t_start) / CLOCKS_PER_SEC;
 	 ++eAdded;
       }
    }
-   return t_elapsed;
 }
 
 /*
