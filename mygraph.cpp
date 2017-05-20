@@ -285,7 +285,7 @@ namespace mygraph {
     void save( ostream& os ) {
 	 
     }
-
+     
      Graph( const Graph& H ) {
 	n = H.n;
 	m = 0;

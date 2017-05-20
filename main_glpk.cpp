@@ -12,8 +12,8 @@ enum Algo {DART1, DART2, OPT};
 
 void randomAddEdges( Graph& G,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint);
-double randomAddEdges( Graph& G, unsigned mAdd);
-double randomAddEdges( tinyGraph& G, unsigned mAdd);
+double randomAddEdges( Graph& G, unsigned mAdd );
+void randomAddEdges( tinyGraph& G, unsigned mAdd, double& , double& );
 double randomAddAndRemoveEdges( Graph& G, unsigned mAdd);
 double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd);
 
@@ -52,8 +52,7 @@ void print_help() {
        << "-R <m_remove> (run DART, then adaptively remove <m_remove> random edges from the network)" << endl
        << "-S <m_addremove> (run DART, then adaptively add <m_addremove> random edges to the network, and then remove the same edges)" << endl
        << "-t [time limit in hours, default is 4]" << endl
-       << "-x [Max number of threads, default is 18]" << endl;
-  
+       << "-C [Perform in-depth comparison of dynamic algorithms]" << endl;
    
 }
 
@@ -92,9 +91,13 @@ int main(int argc, char ** argv) {
   unsigned Nreps = 1;
   unsigned erN = 0;
   double erP;
+  bool bDynCompare = false;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:P") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC") ) != -1) {
     switch(c) {
+    case 'C':
+       bDynCompare = true;
+       break;
     case 'P':
        bPD = true;
        break;
@@ -209,7 +212,7 @@ int main(int argc, char ** argv) {
 	myResults.add( "GraphName", fname );
      }
 
-     if (bOut && bAdd) {
+     if (bDynCompare) {
 	//Perform comprehensive dynamic addition of edges test
 	vector< Algo > A;
 	if (bOpt)
@@ -335,11 +338,17 @@ int main(int argc, char ** argv) {
 
 	if (bAdd) {
 	   G.logg(INFO, "Adding edges...");
-	   t_elapsed += randomAddEdges( g, mAdd );
+	   double tinyGraphUpdateTime;
+	   double dart2AddTime;
+	   randomAddEdges( g, mAdd, tinyGraphUpdateTime, dart2AddTime );
 	   size = g.countS();
-	   G.logg( INFO, "After adding " +to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(t_elapsed) );
+	   G.logg( INFO, "After adding " + to_string(mAdd) + " edges, " + to_string(size) + " " + to_string(dart2AddTime) );
 
 	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+
+	   myResults.add( "tinyGraphUpdate", tinyGraphUpdateTime );
+	   myResults.add( "Dart2AddTime", dart2AddTime );
+	   myResults.add( "NumberAdded", mAdd );
 	}
 
 	if (bAddRemove) {
@@ -486,6 +495,7 @@ void outputResult( tinyGraph& G, string algName, unsigned solSize, double time, 
    mr.print_xml( os );
 }
 
+
 void randomAddEdges( Graph& G_in,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint = 1) {
    Graph G( G_in );
@@ -572,27 +582,34 @@ void randomAddEdges( Graph& G_in,
 }
 
 /*
- * Add random edges to G and update the Dart solution
- * Returns the total time elapsed
+ * Add random edges to tinygraph g and update the Dart2 solution
+ * Returns the time to update the tinyGraph structure and the time
+ * taken by Dart2Add
  */
-double randomAddEdges( tinyGraph& G, unsigned mAdd) {
-   uniform_int_distribution<> vdist(0, G.n - 1);
-   double t_elapsed = 0.0;
-   
+void randomAddEdges( tinyGraph& g, unsigned mAdd, double& graphUpdateTime, double& dart2AddTime) {
+   uniform_int_distribution<> vdist(0, g.n - 1);
+
    unsigned eAdded = 0;
+   clock_t t_start;
+   graphUpdateTime = 0.0;
+   dart2AddTime = 0.0;
+   bool bAdded;
    while (eAdded < mAdd) {
       node_id from = vdist( gen );
       node_id to = vdist( gen );
       vector< tinyEdge >::iterator e;
-      if ( G.add_edge_half( from, to, e ) ) {
-	G.add_edge_half(to, from, e );
-	G.m += 1;
-	
-	 t_elapsed += G.dart_add_edge( to, e );
+      t_start = clock();
+      bAdded = g.add_edge_half( from, to, e );
+      if ( bAdded ) {
+	 g.add_edge_half(to, from, e );
+	 g.m += 1;
+	 graphUpdateTime += double (clock() - t_start) / CLOCKS_PER_SEC;
+	 t_start = clock();
+	 g.dart_add_edge( to, e );
+	 dart2AddTime += double (clock() - t_start) / CLOCKS_PER_SEC;
 	 ++eAdded;
       }
    }
-   return t_elapsed;
 }
 
 double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd) {
