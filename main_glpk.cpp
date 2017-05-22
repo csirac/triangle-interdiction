@@ -10,6 +10,11 @@
 
 enum Algo {DART1, DART2, OPT};
 
+void randomRemoveEdges( Graph& G_in,
+			unsigned mRemove,
+			vector< Algo >& A,
+			ostream& os, unsigned checkpoint);
+
 void randomAddEdges( Graph& G,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint);
 void randomAddEdges( Graph& G, unsigned mAdd, double& graphUpdateTime, double& dart1AddTime);
@@ -213,23 +218,46 @@ int main(int argc, char ** argv) {
      }
 
      if (bDynCompare) {
-	//Perform comprehensive dynamic addition of edges test
-	vector< Algo > A;
-	if (bOpt)
-	   A.push_back( OPT );
-	if (bDart)
-	   A.push_back( DART1 );
-	if (bDart2)
-	   A.push_back( DART2 );
+	if (bAdd) {
+	   //Perform comprehensive dynamic addition of edges test
+	   vector< Algo > A;
+	   if (bOpt)
+	      A.push_back( OPT );
+	   if (bDart)
+	      A.push_back( DART1 );
+	   if (bDart2)
+	      A.push_back( DART2 );
+	   
+	   for (unsigned iter = 0; iter < Nreps; ++iter) {
+	      ofstream ofile;
+	      ofile.open( outfilename.c_str(), ios::app );
 
-	for (unsigned iter = 0; iter < Nreps; ++iter) {
-	   ofstream ofile;
-	   ofile.open( outfilename.c_str(), ios::app );
-
-	   randomAddEdges( G, 
-			   mAdd, A, ofile, mAdd / 10 );
+	      randomAddEdges( G, 
+			      mAdd, A, ofile, mAdd / 10 );
      
-	   ofile.close();
+	      ofile.close();
+	   }
+	}
+
+	if (bRemove) {
+	   //Perform comprehensive dynamic removal of edges test
+	   vector< Algo > A;
+	   if (bOpt)
+	      A.push_back( OPT );
+	   if (bDart)
+	      A.push_back( DART1 );
+	   if (bDart2)
+	      A.push_back( DART2 );
+	   
+	   for (unsigned iter = 0; iter < Nreps; ++iter) {
+	      ofstream ofile;
+	      ofile.open( outfilename.c_str(), ios::app );
+
+	      randomRemoveEdges( G, 
+				 mRemove, A, ofile, mRemove / 10 );
+     
+	      ofile.close();
+	   }
 	}
 	
 	exit( 0 );
@@ -290,25 +318,26 @@ int main(int argc, char ** argv) {
 	   myResults.add( "Dart1AddSize", G.sizeS );
 	   myResults.add( "NumberAdded", mAdd );
 	   
-	   G.logg(DEBUG, "Comprehensive feasibility check...");
-	   G.T.clear();
-	   G.init_static();
-	   if( !G.verify_graph() ) {
-	      G.logg(ERROR, "Graph structure is incorrect." );
-	      exit(1);
-	   } else {
-	      G.logg(INFO, "Graph structure is correct." );
-	   }
+	//    G.logg(DEBUG, "Comprehensive feasibility check...");
+	//    G.T.clear();
+	//    G.init_static();
+	//    if( !G.verify_graph() ) {
+	//       G.logg(ERROR, "Graph structure is incorrect." );
+	//       exit(1);
+	//    } else {
+	//       G.logg(INFO, "Graph structure is correct." );
+	//    }
 
-	   G.list_triangles();
-	   G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
-	   if (G.ensure_feasibility()) {
-	      G.logg(DEBUG, "Dart_add has maintained feasibility...");
-	   }  else {
-	      G.logg(ERROR, "Dart_add has violated feasibility.");
-	   }
+	//    G.list_triangles();
+	//    G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
+	//    if (G.ensure_feasibility()) {
+	//       G.logg(DEBUG, "Dart_add has maintained feasibility...");
+	//    }  else {
+	//       G.logg(ERROR, "Dart_add has violated feasibility.");
+	//    }
+	// 
 	}
-
+	
 	G.clear_edges();
      }
   
@@ -447,7 +476,7 @@ int main(int argc, char ** argv) {
        myResults.print_xml( ofile );
        ofile.close();
      }
-     myResults.print_xml( cout );
+     //     myResults.print_xml( cout );
   }
 
 
@@ -582,6 +611,104 @@ void randomAddEdges( Graph& G_in,
    }
 }
 
+void randomRemoveEdges( Graph& G_in,
+			unsigned mRemove,
+			vector< Algo >& A,
+			ostream& os, unsigned checkpoint = 1) {
+   Graph G( G_in );
+   //Need an initial static run.
+   G_in.logg( INFO, "Starting initial static solutions..." );
+   clock_t t_start = clock();
+   G.dart_base();
+   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+   int solSize1 = G.countS();
+   outputResult( G, "Dart1Static", solSize1, t_elapsed, os );
+
+   G.init_dynamic();
+   
+   tinyGraph g( G );
+   t_start = clock();
+   g.dart_base();
+   t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+   int solSize2 = g.countS();
+   outputResult( g, "Dart2Static", solSize2, t_elapsed, os );
+
+   //Begin edge removal procedure
+   uniform_int_distribution<> vdist(0, g.n - 1);
+   unsigned numRemoved = 0;
+   double dartTime2, dartTime1;
+   double updateTime2, updateTime1;
+   while (numRemoved < mRemove) {
+      node_id from;
+      do {
+	 from = vdist( gen );
+      } while (g.adjList[from].neis.size() == 0);
+
+      uniform_int_distribution<> neiDist(0, g.adjList[from].neis.size() - 1);
+      size_t toIndex = neiDist( gen );
+      vector< tinyEdge >::iterator e = g.adjList[ from ].neis.begin() + toIndex;
+
+      //remove edge
+      dartTime2 = 0.0;
+      updateTime2 = 0.0;
+      solSize2 += g.dart_remove_edge( from, e, dartTime2, updateTime2 );
+
+      g.preprocessTime = updateTime2;
+      outputResult( g, "Dart2Remove", solSize2, dartTime2, os );
+
+      Node& From = G.V[ from ];
+      auto f = From.neighbors.begin();
+      size_t tmpST = 0;
+      while (tmpST < toIndex) {
+	 ++tmpST;
+	 ++f;
+      }
+
+      dartTime1 = 0.0;
+      updateTime1 = 0.0;
+      solSize1 += G.dart_remove_edge( *f, dartTime1, updateTime1 );
+      G.preprocessTime = updateTime1;
+      outputResult( G, "Dart1Remove", solSize1, dartTime1, os );
+      if ((numRemoved + 1) % checkpoint == 0) {
+	 G_in.logg( INFO, "Reached checkpoint..." );
+	 //Create static graphs
+	 Graph H( G );
+	 tinyGraph h( g );
+	 
+	 for (unsigned i = 0; i < A.size(); ++i) {
+	    switch( A[i] ) {
+	    case DART1:
+	       t_start = clock();
+	       H.dart_base();
+	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	       outputResult( H, "Dart1", t_elapsed, os );
+	       break;
+
+	    case DART2:
+	       t_start = clock();
+	       h.dart_base();
+	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	       outputResult( h, "Dart2", t_elapsed, os );
+	       break;
+
+	    case OPT:
+	       t_start = clock();
+	       H.clear_edges();
+	       H.list_triangles();
+	       GLPK_solver GLPK( H, 1 );
+	       GLPK.MIP_solve( H );
+	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	       outputResult( H, "Opt", t_elapsed, os );
+	       H.clear_edges();
+	       break;
+	    }
+	 }	       
+      }
+	 
+      ++numRemoved;
+   }
+}
+
 /*
  * Add random edges to tinygraph g and update the Dart2 solution
  * Returns the time to update the tinyGraph structure and the time
@@ -637,7 +764,7 @@ double randomAddAndRemoveEdges( tinyGraph& G, unsigned mAdd) {
 
    for (unsigned i = 0; i < edgesAdded.size(); i += 2) {
      vector< tinyEdge >::iterator ee = G.findEdgeInList( edgesAdded[ i ], edgesAdded[ i + 1 ] );
-     t_elapsed += G.dart_remove_edge( edgesAdded[i], ee );
+     //     t_elapsed += G.dart_remove_edge( edgesAdded[i], ee );
    }
    
    return t_elapsed;
@@ -701,7 +828,7 @@ double randomAddAndRemoveEdges( Graph& G, unsigned mAdd) {
    for (auto it = edges_added.begin();
 	it != edges_added.end();
 	++it ) {
-      t_elapsed += G.dart_remove_edge( *it, true );
+      //      t_elapsed += G.dart_remove_edge( *it, true );
    }
    
    return t_elapsed;

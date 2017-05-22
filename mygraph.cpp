@@ -17,6 +17,10 @@
 
 using namespace std;
 
+double elapsedTime( clock_t& t_start ) {
+   return double(clock() - t_start) / CLOCKS_PER_SEC;
+}
+
 template<typename T>
 void print_vector( vector< T >& v, ostream& os = cout ) {
   for (size_t i = 0; i < v.size(); ++i) {
@@ -1004,88 +1008,113 @@ namespace mygraph {
 
     /*
      * Update dart solution upon edge removal
-     * Returns time to update solution
+     * Returns number of edges added to solution
+     *   (could be negative if more edges are removed than added)
      */
-    double dart_remove_edge( pedge& e, bool expensivePruning = false ) {
-      clock_t t_start = clock();
-      if (e->in_S || e->in_W) {
-	pangle T_e = e->T_e;
-	//get edges f,g, where T_e = efg
-	pedge f; pedge g;
-	if (T_e->e1 == e) {
-	  f = T_e->e2;
-	  g = T_e->e3;
-	}
-	if (T_e->e2 == e) {
-	  f = T_e->e1;
-	  g = T_e->e3;
-	}
-	if (T_e->e3 == e) {
-	  f = T_e->e1;
-	  g = T_e->e2;
-	}
+     int dart_remove_edge( pedge& e, double& dartTime,
+			   double& updateTime,
+			   bool expensivePruning = false ) {
+	clock_t t_update;
+	double updateTimeStep;
+	clock_t t_start = clock();
+	int solAdded = 0;
+	
+	if (e->in_S || e->in_W) {
+	   pangle T_e = e->T_e;
+	   //get edges f,g, where T_e = efg
+	   pedge f; pedge g;
+	   if (T_e->e1 == e) {
+	      f = T_e->e2;
+	      g = T_e->e3;
+	   }
+	   if (T_e->e2 == e) {
+	      f = T_e->e1;
+	      g = T_e->e3;
+	   }
+	   if (T_e->e3 == e) {
+	      f = T_e->e1;
+	      g = T_e->e2;
+	   }
 
-	if (expensivePruning) {
-	  node_id from = e->from;
-	  node_id to = e->to;
-	  //Delete e from the graph structure
-	  remove_edge( e );
-	  //Need to delete T_e, as well
-	  Tsol.erase( T_e );
+	   if (expensivePruning) {
+	      node_id from = e->from;
+	      node_id to = e->to;
+	      //Delete e from the graph structure
+	      remove_edge( e );
+	      //Need to delete T_e, as well
+	      Tsol.erase( T_e );
 
-	  //Removing e might enable some edges to be pruned
-	  //Attempt to do so, but this step could be expensive
-	  local_reprune( from, to );
-	} else {
-	  //Simply delete the edge
-	  remove_edge( e );
-	  //Need to delete T_e, as well
-	  Tsol.erase( T_e );
-	}
+	      //Removing e might enable some edges to be pruned
+	      //Attempt to do so, but this step could be expensive
+	      local_reprune( from, to );
+	   } else {
+	      //Simply delete the edge
+	      if (e->in_S)
+		 --solAdded;
+	      
+	      t_update = clock();
+	      remove_edge( e );
+
+	      //Need to delete T_e, as well
+	      Tsol.erase( T_e );
+	      updateTimeStep = elapsedTime( t_update );
+	   }
 	    
-	//Remove f,g from solution
-	g->in_S = false;
-	g->in_W = false;
-	f->in_S = false;
-	f->in_W = false;
-	vector< pedge > unprunedEdges;
-	Triangle T_f;
-	if ( find_disjoint_triangle( f, T_f, unprunedEdges ) ) {
-	  //Add T_f to S
-	  T_f.e1->in_S = true;
-	  T_f.e2->in_S = true;
-	  T_f.e3->in_S = true;
-	  Tsol.push_front( T_f );
-	  T_f.e1->T_e = Tsol.begin();
-	  T_f.e2->T_e = Tsol.begin();
-	  T_f.e3->T_e = Tsol.begin();
-	  unprunedEdges.push_back( T_f.e1 );
-	  unprunedEdges.push_back( T_f.e2 );
-	  unprunedEdges.push_back( T_f.e3 );
-	}
-	Triangle T_g;
-	if ( find_disjoint_triangle( g, T_g, unprunedEdges ) ) {
-	  //Add T_g to S
-	  T_g.e1->in_S = true;
-	  T_g.e2->in_S = true;
-	  T_g.e3->in_S = true;
-	  Tsol.push_front( T_g );
-	  T_g.e1->T_e = Tsol.begin();
-	  T_g.e2->T_e = Tsol.begin();
-	  T_g.e3->T_e = Tsol.begin();
-	  unprunedEdges.push_back( T_g.e1 );
-	  unprunedEdges.push_back( T_g.e2 );
-	  unprunedEdges.push_back( T_g.e3 );
+	   //Remove f,g from solution
+	   if (g->in_S)
+	      --solAdded;
+	   if (f->in_S)
+	      --solAdded;
+	   
+	   g->in_S = false;
+	   g->in_W = false;
+	   f->in_S = false;
+	   f->in_W = false;
+	   vector< pedge > unprunedEdges;
+	   Triangle T_f;
+	   if ( find_disjoint_triangle( f, T_f, unprunedEdges ) ) {
+	      //Add T_f to S
+	      T_f.e1->in_S = true;
+	      T_f.e2->in_S = true;
+	      T_f.e3->in_S = true;
+	      Tsol.push_front( T_f );
+	      T_f.e1->T_e = Tsol.begin();
+	      T_f.e2->T_e = Tsol.begin();
+	      T_f.e3->T_e = Tsol.begin();
+	      unprunedEdges.push_back( T_f.e1 );
+	      unprunedEdges.push_back( T_f.e2 );
+	      unprunedEdges.push_back( T_f.e3 );
+	   }
+	   Triangle T_g;
+	   if ( find_disjoint_triangle( g, T_g, unprunedEdges ) ) {
+	      //Add T_g to S
+	      T_g.e1->in_S = true;
+	      T_g.e2->in_S = true;
+	      T_g.e3->in_S = true;
+	      Tsol.push_front( T_g );
+	      T_g.e1->T_e = Tsol.begin();
+	      T_g.e2->T_e = Tsol.begin();
+	      T_g.e3->T_e = Tsol.begin();
+	      unprunedEdges.push_back( T_g.e1 );
+	      unprunedEdges.push_back( T_g.e2 );
+	      unprunedEdges.push_back( T_g.e3 );
+	   }
+
+	   solAdded += unprunedEdges.size();
+
+	   solAdded -= prune( unprunedEdges );
+	} else {
+	   //simply remove edge from graph
+	   t_update = clock();
+	   remove_edge( e );
+	   updateTimeStep = elapsedTime( t_update );
 	}
 
-	prune( unprunedEdges );
-      } else {
-	//simply remove edge from graph
-	remove_edge( e );
-      }
-	 
-      return double (clock() - t_start) / CLOCKS_PER_SEC;
-    }
+	dartTime += elapsedTime( t_start ) - updateTimeStep;
+	updateTime += updateTimeStep;
+
+	return solAdded;
+     }
       
     /*
      * DART-BASE 
@@ -2657,6 +2686,22 @@ namespace mygraph {
 
       return it;
     }
+
+     vector< tinyEdge >::iterator clearInList( vector< tinyEdge >& l, node_id& v, bool&  wasInS ) {
+      auto it = l.begin();
+	 
+      while (it->getId() != v)
+	++it;
+      if (it->inS())
+	 wasInS = true;
+      else
+	 wasInS = false;
+
+      it->unsetS();
+      it->unsetW();
+
+      return it;
+    }
     
     void pruneSInList( vector< tinyEdge >& l, node_id& v ) {
       auto it = l.begin();
@@ -2870,46 +2915,46 @@ namespace mygraph {
 	return false;
     }
     
-    unsigned dart_add_edge( node_id s, vector< tinyEdge >::iterator st ) {
-       unsigned solAdded = 0;
+     unsigned dart_add_edge( node_id s, vector< tinyEdge >::iterator st ) {
+	unsigned solAdded = 0;
       
-       vector<tinyEdge>::iterator sv; //want references so edges in graph can be modified
-       vector<tinyEdge>::iterator tv;
+	vector<tinyEdge>::iterator sv; //want references so edges in graph can be modified
+	vector<tinyEdge>::iterator tv;
 
-       vector< smEdge > unprunedEdges;
-       if ( find_disjoint_triangle( s, *st, sv, tv, unprunedEdges )) {
-	  //Add this triangle to S
-	  node_id& t = st->target;
-	  node_id& v = sv->target;
+	vector< smEdge > unprunedEdges;
+	if ( find_disjoint_triangle( s, *st, sv, tv, unprunedEdges )) {
+	   //Add this triangle to S
+	   node_id& t = st->target;
+	   node_id& v = sv->target;
 
-	  smEdge e_tmp;
-	  e_tmp.from = s;
-	  e_tmp.to = t;
-	  unprunedEdges.push_back( e_tmp );
-	  e_tmp.to = v;
-	  unprunedEdges.push_back( e_tmp );
-	  e_tmp.from = t;
-	  unprunedEdges.push_back( e_tmp );
+	   smEdge e_tmp;
+	   e_tmp.from = s;
+	   e_tmp.to = t;
+	   unprunedEdges.push_back( e_tmp );
+	   e_tmp.to = v;
+	   unprunedEdges.push_back( e_tmp );
+	   e_tmp.from = t;
+	   unprunedEdges.push_back( e_tmp );
 	
-	  tinyTriangle sT( t, v );
-	  tinyTriangle tT( s, v );
-	  tinyTriangle vT( s, t );
-	  adjList[ s ].solutionTriangles.push_back (sT);
-	  adjList[ t ].solutionTriangles.push_back (tT);
-	  adjList[ v ].solutionTriangles.push_back (vT);
+	   tinyTriangle sT( t, v );
+	   tinyTriangle tT( s, v );
+	   tinyTriangle vT( s, t );
+	   adjList[ s ].solutionTriangles.push_back (sT);
+	   adjList[ t ].solutionTriangles.push_back (tT);
+	   adjList[ v ].solutionTriangles.push_back (vT);
 	    
-	  vector< tinyEdge >& At = adjList[ t ].neis;
-	  vector< tinyEdge >& Av = adjList[ v ].neis;
+	   vector< tinyEdge >& At = adjList[ t ].neis;
+	   vector< tinyEdge >& Av = adjList[ v ].neis;
 
-	  setSInList( At, s );
-	  setSInList( Av, s );
-	  setSInList( Av, t );
+	   setSInList( At, s );
+	   setSInList( Av, s );
+	   setSInList( Av, t );
 	    
-	  st->setS();
-	  sv->setS();
-	  tv->setS();
+	   st->setS();
+	   sv->setS();
+	   tv->setS();
 
-	  solAdded += 3;
+	   //solAdded += 3;
        }
 
        solAdded += unprunedEdges.size();
@@ -2941,33 +2986,57 @@ namespace mygraph {
       
       return bitS; //As failure value, no node id can be that big
     }
-    
-    double dart_remove_edge( node_id s, vector< tinyEdge >::iterator st ) {
-      clock_t t_start = clock();
-      node_id t = st->getId();
-      if (st->inS() || st->inW() ) {
-	//remove the solution triangles
-	node_id v = eraseSolTriangle( s, t );
-	eraseSolTriangle( t, s );
-	eraseSolTriangle( s, v );
-	//remove (s,t)
-	remove_edge( s, t );
 
-	//Remove sv, tv from solution
-	vector< tinyEdge >::iterator sv = clearInList( adjList[ s ].neis, v );
-	clearInList( adjList[ v ].neis, s );
-	vector< tinyEdge >::iterator tv = clearInList( adjList[ t ].neis, v );
-	clearInList( adjList[ v ].neis, t );
+     /*
+      * DART2_REMOVE
+      * Returns number of edges added to solution.
+      */
+     int dart_remove_edge( node_id s, vector< tinyEdge >::iterator st, double& dartTime, double& updateTime ) {
+	int solAdded = 0;
+	double tUpdateStep;
+	clock_t t_dart = clock();
+	node_id t = st->getId();
+	if (st->inS() || st->inW() ) {
+	   //remove the solution triangles
+	   clock_t t_update = clock();
+	   node_id v = eraseSolTriangle( s, t );
+	   eraseSolTriangle( t, s );
+	   eraseSolTriangle( s, v );
 
-	dart_add_edge( s, sv );
-	dart_add_edge( t, tv );
+	   //remove (s,t)
+	   if (st->inS())
+	      --solAdded;
+	   
+	   remove_edge( s, t );
+	   tUpdateStep = double (clock() - t_update) / CLOCKS_PER_SEC;
+
+	   //Remove sv, tv from solution
+	   bool wasInS;
+	   vector< tinyEdge >::iterator sv = clearInList( adjList[ s ].neis, v, wasInS );
+	   if (wasInS)
+	      --solAdded;
+	   
+	   clearInList( adjList[ v ].neis, s );
+
+	   vector< tinyEdge >::iterator tv = clearInList( adjList[ t ].neis, v, wasInS );
+	   if (wasInS)
+	      --solAdded;
+	   
+	   clearInList( adjList[ v ].neis, t );
+
+	   solAdded += dart_add_edge( s, sv );
+	   solAdded += dart_add_edge( t, tv );
 	
       } else {
-	remove_edge( s, t );
+	 clock_t t_update = clock();
+	 remove_edge( s, t );
+	 tUpdateStep = double (clock() - t_update) / CLOCKS_PER_SEC;
       }
 
-      return double (clock() - t_start) / CLOCKS_PER_SEC;
-    }
+      updateTime += tUpdateStep;
+      dartTime += double (clock() - t_dart) / CLOCKS_PER_SEC - tUpdateStep;
+      return solAdded;
+     }
       
     /*
      * DART-BASE (no triangle listing)
