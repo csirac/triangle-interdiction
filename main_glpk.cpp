@@ -736,8 +736,6 @@ void randomRemoveEdges( tinyGraph& g,
       vector< tinyEdge >::iterator e = g.adjList[ from ].neis.begin() + toIndex;
 
       //remove edge
-      dartTime2 = 0.0;
-      updateTime2 = 0.0;
       g.dart_remove_edge( from, e, dart2RemTime, graphUpdateTime );
 	 
       ++numRemoved;
