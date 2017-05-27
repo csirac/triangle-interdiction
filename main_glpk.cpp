@@ -97,11 +97,14 @@ int main(int argc, char ** argv) {
   unsigned erN = 0;
   double erP;
   bool bDynCompare = false;
+  unsigned checkpoint = 1;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC:") ) != -1) {
     switch(c) {
     case 'C':
        bDynCompare = true;
+       s_arg.assign( optarg );
+       checkpoint = stoi( s_arg );
        break;
     case 'P':
        bPD = true;
@@ -233,7 +236,7 @@ int main(int argc, char ** argv) {
 	      ofile.open( outfilename.c_str(), ios::app );
 
 	      randomAddEdges( G, 
-			      mAdd, A, ofile, mAdd / 10 );
+			      mAdd, A, ofile, checkpoint );
      
 	      ofile.close();
 	   }
@@ -254,7 +257,7 @@ int main(int argc, char ** argv) {
 	      ofile.open( outfilename.c_str(), ios::app );
 
 	      randomRemoveEdges( G, 
-				 mRemove, A, ofile, mRemove / 10 );
+				 mRemove, A, ofile, checkpoint );
      
 	      ofile.close();
 	   }
@@ -485,14 +488,18 @@ int main(int argc, char ** argv) {
   return 0;
 }
 
-void outputResult( Graph& G, string algName, double time, ostream& os ) {
+void outputResult( Graph& G, string algName, double time, ostream& os, bool xml = true ) {
    resultsHandler mr;
    mr.add( algName + "Size", G.countS() );
    mr.add( algName + "Time", time );
    mr.add( "GraphNodes", G.V.size() );
    mr.add( "GraphEdges", G.E.size() );
    mr.add( "GraphPreprocess", G.preprocessTime );
-   mr.print_xml( os );
+   if (xml)
+      mr.print_xml( os );
+   else
+      mr.print( os );
+
 }
 
 void outputResult( Graph& G, string algName, unsigned solSize, double time, ostream& os ) {
@@ -505,14 +512,17 @@ void outputResult( Graph& G, string algName, unsigned solSize, double time, ostr
    mr.print_xml( os );
 }
 
-void outputResult( tinyGraph& G, string algName, double time, ostream& os ) {
+void outputResult( tinyGraph& G, string algName, double time, ostream& os, bool xml = true ) {
    resultsHandler mr;
    mr.add( algName + "Size", G.countS() );
    mr.add( algName + "Time", time );
    mr.add( "GraphNodes", G.n );
    mr.add( "GraphEdges", G.m );
    mr.add( "GraphPreprocess", G.preprocessTime );
-   mr.print_xml( os );
+   if (xml)
+      mr.print_xml( os );
+   else
+      mr.print( os );
 }
 
 void outputResult( tinyGraph& G, string algName, unsigned solSize, double time, ostream& os ) {
@@ -525,9 +535,58 @@ void outputResult( tinyGraph& G, string algName, unsigned solSize, double time, 
    mr.print_xml( os );
 }
 
+void runStaticAlgs( vector< Algo >& A,
+		    tinyGraph& h,
+		    Graph& H,
+		    ostream& os,
+		    Logger& logg) {
+   clock_t t_start;
+   double t_elapsed;
+   for (unsigned i = 0; i < A.size(); ++i) {
+      switch( A[i] ) {
+      case DART1:
+	 logg( INFO, "Starting Dart1..." );
+	 t_start = clock();
+	 H.dart_base();
+	 t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 outputResult( H, "Dart1", t_elapsed, os );
+	 logg( INFO, "Dart1 finished." );
+	 outputResult( H, "Dart1", t_elapsed, logg.of, false );	 
+	 break;
+
+      case DART2:
+	 logg( INFO, "Starting Dart2..." );
+	 t_start = clock();
+	 h.dart_base();
+	 t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 outputResult( h, "Dart2", t_elapsed, os );
+	 logg( INFO, "Dart2 finished." );
+	 outputResult( h, "Dart2", t_elapsed, logg.of, false );
+	 break;
+
+      case OPT:
+	 logg( INFO, "Starting OPT(GLPK)..." );
+	 t_start = clock();
+	 H.clear_edges();
+	 H.list_triangles();
+	 GLPK_solver GLPK( H, 1 );
+	 GLPK.MIP_solve( H );
+	 t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
+	 outputResult( H, "Opt", t_elapsed, os );
+	 logg( INFO, "OPT(GLPK) finished." );	       
+	 outputResult( H, "Opt", t_elapsed, logg.of, false );
+	 
+	 H.clear_edges();
+
+	 break;
+      }
+   }	       
+}
+		   
 
 void randomAddEdges( Graph& G_in,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint = 1) {
+   G_in.logg( INFO, "Starting in-depth comparison, addition of edges..." );
    Graph G( G_in );
    //DartAdd, Dart2Add need an initial static run.
    G_in.logg( INFO, "Starting initial static solutions..." );
@@ -576,34 +635,7 @@ void randomAddEdges( Graph& G_in,
 	    Graph H( G );
 	    tinyGraph h( g );
 	 
-	    for (unsigned i = 0; i < A.size(); ++i) {
-	       switch( A[i] ) {
-	       case DART1:
-		  t_start = clock();
-		  H.dart_base();
-		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-		  outputResult( H, "Dart1", t_elapsed, os );
-		  break;
-
-	       case DART2:
-		  t_start = clock();
-		  h.dart_base();
-		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-		  outputResult( h, "Dart2", t_elapsed, os );
-		  break;
-
-	       case OPT:
-		  t_start = clock();
-		  H.clear_edges();
-		  H.list_triangles();
-		  GLPK_solver GLPK( H, 1 );
-		  GLPK.MIP_solve( H );
-		  t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-		  outputResult( H, "Opt", t_elapsed, os );
-		  H.clear_edges();
-		  break;
-	       }
-	    }	       
+	    runStaticAlgs( A, h, H, os, G_in.logg );
 	 }
 	 
 	 ++eAdded;
@@ -615,6 +647,7 @@ void randomRemoveEdges( Graph& G_in,
 			unsigned mRemove,
 			vector< Algo >& A,
 			ostream& os, unsigned checkpoint = 1) {
+   G_in.logg( INFO, "Starting in-depth comparison, removal of edges..." );
    Graph G( G_in );
    //Need an initial static run.
    G_in.logg( INFO, "Starting initial static solutions..." );
@@ -657,7 +690,7 @@ void randomRemoveEdges( Graph& G_in,
       outputResult( g, "Dart2Remove", solSize2, dartTime2, os );
 
       Node& From = G.V[ from ];
-      auto f = From.neighbors.begin();
+      list< pedge >::iterator f = From.neighbors.begin();
       size_t tmpST = 0;
       while (tmpST < toIndex) {
 	 ++tmpST;
@@ -675,34 +708,7 @@ void randomRemoveEdges( Graph& G_in,
 	 Graph H( G );
 	 tinyGraph h( g );
 	 
-	 for (unsigned i = 0; i < A.size(); ++i) {
-	    switch( A[i] ) {
-	    case DART1:
-	       t_start = clock();
-	       H.dart_base();
-	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	       outputResult( H, "Dart1", t_elapsed, os );
-	       break;
-
-	    case DART2:
-	       t_start = clock();
-	       h.dart_base();
-	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	       outputResult( h, "Dart2", t_elapsed, os );
-	       break;
-
-	    case OPT:
-	       t_start = clock();
-	       H.clear_edges();
-	       H.list_triangles();
-	       GLPK_solver GLPK( H, 1 );
-	       GLPK.MIP_solve( H );
-	       t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	       outputResult( H, "Opt", t_elapsed, os );
-	       H.clear_edges();
-	       break;
-	    }
-	 }	       
+	 runStaticAlgs( A, h, H, os, G_in.logg );
       }
 	 
       ++numRemoved;
