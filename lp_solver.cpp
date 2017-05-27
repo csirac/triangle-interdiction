@@ -125,6 +125,8 @@ bool solve_lp ( Graph& G,
       return true;
    else
       return false;
+
+   env.end();
 }
 
 /*
