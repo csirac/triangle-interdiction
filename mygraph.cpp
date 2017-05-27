@@ -1177,9 +1177,8 @@ namespace mygraph {
       free_prune();
       
       runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
-      //      logg(INFO, "DART_BASE finished, size of S: " + to_string(countS));
 
-      return countS;
+      return 0;
     }
 
 
@@ -1731,21 +1730,30 @@ namespace mygraph {
      * Input is an iterator to an element
      * in the edge list
      */
-    pedge remove_edge( pedge& e_to_remove ) {
-      //remove from its incident nodes' adjacency list
-      node_id from = e_to_remove->from;
-      node_id to = e_to_remove->to;
-      auto it2 = V[ from ].neighbors.begin();
-      while (*it2 != e_to_remove)
-	++it2;
-      V[ from ].neighbors.erase( it2 );
-      it2 = V[ to ].neighbors.begin();
-      while (*it2 != e_to_remove)
-	++it2;
-      V[ to ].neighbors.erase( it2 );
+    void remove_edge( pedge& e_to_remove ) {
+       //remove from its incident nodes' adjacency list
+       node_id from = e_to_remove->from;
+       node_id to = e_to_remove->to;
 
-      //Finally, discard the edge itself
-      return E.erase( e_to_remove );
+       //       cerr << "Removing " << from << ' ' << to << endl;
+       list< pedge >::iterator it2 = V[ from ].neighbors.begin();
+
+       while ((*it2)->other( from ) != to) {
+
+	  ++it2;
+       }
+
+       V[ from ].neighbors.erase( it2 );
+
+       list< pedge >::iterator it3 = V[ to ].neighbors.begin();
+      
+       while ((*it3)->other( to ) != from ) {
+
+	  ++it3;
+       }
+       V[ to ].neighbors.erase( it3 );
+       
+       E.erase( e_to_remove );
     }
 
     //Only works with undirected edges atm
@@ -2328,7 +2336,7 @@ namespace mygraph {
     }
 
     bool inS() {
-      return (target >> 31);
+       return (target >> 31);
     }
 
     bool inW() {
@@ -2535,7 +2543,7 @@ namespace mygraph {
     bool remove_edge_half( node_id from, node_id to ) {
       if (from == to)
 	return false;
-      
+
       vector< tinyEdge >& v1 = adjList[ from ].neis;
 
       auto it = v1.begin();
@@ -2845,16 +2853,17 @@ namespace mygraph {
     bool prune( smEdge& ee ) {
       node_id& s = ee.from;
       node_id& t = ee.to;
+
       tinyEdge& st = *(findEdgeInList( adjList[ s ].neis, t ));
       if (!st.inS())
-	return false;
+	 return false;
       bool prunable = true;
       vector< tinyEdge >& A_s = adjList[s].neis;
       vector< tinyEdge >& A_t = adjList[t].neis; 
       auto it1 = A_s.begin();
       auto it2 = A_t.begin();
       if (it1 == A_s.end() || it2 == A_t.end() ) {
-	return true;
+	 return true;
       }
       while (1) {
 	if (*it1 < *it2) {
@@ -2977,11 +2986,11 @@ namespace mygraph {
       for (auto it = adjList[s].solutionTriangles.begin();
 	   it != adjList[s].solutionTriangles.end();
 	   ++it) {
-	if (it->contains( t, v )) {
-	  adjList[s].solutionTriangles.erase( it );
-	  return v;
-	  break;
-	}
+	 if (it->contains( t, v )) {
+	    adjList[s].solutionTriangles.erase( it );
+	    return v;
+	    break;
+	 }
       }
       
       return bitS; //As failure value, no node id can be that big
@@ -2991,7 +3000,9 @@ namespace mygraph {
       * DART2_REMOVE
       * Returns number of edges added to solution.
       */
-     int dart_remove_edge( node_id s, vector< tinyEdge >::iterator st, double& dartTime, double& updateTime ) {
+     int dart_remove_edge( node_id s,
+			   vector< tinyEdge >::iterator st,
+			   double& dartTime, double& updateTime ) {
 	int solAdded = 0;
 	double tUpdateStep;
 	clock_t t_dart = clock();
@@ -3002,6 +3013,7 @@ namespace mygraph {
 	   node_id v = eraseSolTriangle( s, t );
 	   eraseSolTriangle( t, s );
 	   eraseSolTriangle( s, v );
+	   eraseSolTriangle( v, s );
 
 	   //remove (s,t)
 	   if (st->inS())
@@ -3363,64 +3375,28 @@ namespace mygraph {
 	data[ name ] = sval;
       }
       
-      // void print( ostream& os, bool printStdDev = false ) {
-      // 	 //Print names
-      // 	 os << '#';
-      // 	 unsigned index = 1;
-      // 	 for (auto it = data.begin();
-      // 	      it != data.end();
-      // 	      ++it ) {
-      // 	    os << setw(25);
-		 
-      // 	    if (it->second.size() == 1) {
-      // 	       os << to_string( index ) + it->first;
-      // 	       ++index;
-      // 	    } else {
-      // 	       if (printStdDev) {
-      // 		  os << (to_string(index) + it->first + "_m");
-      // 		  ++index;
-      // 		  os << setw(25);
-      // 		  os << (to_string(index) + it->first + "_s");
-      // 		  ++index;
-      // 	       } else {
-      // 		  os << to_string( index ) + it->first;
-      // 		  ++index;
-      // 	       }
-      // 	    }
-      // 	 }
-      // 	 os << endl;
-      // 	 os << fixed;
-      // 	 double mean;
-      // 	 double stddev;
-      // 	 for (auto it = data.begin();
-      // 	      it != data.end();
-      // 	      ++it ) {
-      // 	    //	    os << setprecision( 3 );
-      // 	    if ((it->second).size() > 1) {
-      // 	       //compute mean
-      // 	       mean = 0;
-      // 	       for (unsigned i = 0; i < (it->second).size(); ++i) {
-      // 		  mean += (it->second)[i];
-      // 	       }
-      // 	       mean /= (it->second).size();
+      void print( ostream& os, bool printStdDev = false ) {
+      	 //Print names
+      	 os << '#';
+      	 unsigned index = 1;
+      	 for (auto it = data.begin();
+      	      it != data.end();
+      	      ++it ) {
+      	    os << setw(25);
 
-      // 	       os << setw(25) << mean;
-      // 	       if (printStdDev) {
-      // 		  //compute stddev
-      // 		  stddev = 0;
-      // 		  for (unsigned i = 0; i < (it->second).size(); ++i) {
-      // 		     stddev += ((it->second)[i] - mean) * ((it->second)[i] - mean);
-      // 		  }
-      // 		  stddev /= ((it->second).size() - 1);
-      // 		  stddev = sqrt( stddev );
-      // 		  os << setw(25) << stddev;
-      // 	       }
-      // 	    } else {
-      // 	       os << setw(25) << (it->second).front();
-      // 	    }
-      // 	 }
-      // 	 os << endl;
-      // }
+	    os << to_string( index ) + it->first;
+	    ++index;
+
+      	 }
+      	 os << endl;
+      	 for (auto it = data.begin();
+      	      it != data.end();
+      	      ++it ) {
+	    os << setw(25) << (it->second);
+
+      	 }
+      	 os << endl;
+      }
 
      void print_xml( ostream& os ) {
        //os << "<?xml version = "1.0" encoding="UTF-8"?>" << endl;

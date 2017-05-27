@@ -5,7 +5,7 @@ CPLEX_FLAGS=${CPLEX_INCLUDE} ${CPLEX_LIB} -DNDEBUG -DILOSTRICTPOD -DIL_STD
 
 all: main_glpk.cpp
 	g++ main_glpk.cpp -o grec ${CPPFLAGS} -lglpk -lpthread
-test: main_glpk.cpp
+test: main_glpk.cpp mygraph.cpp
 	g++ main_glpk.cpp -o grec_test -std=c++11 -O0 -g -lglpk -lpthread
 cplex: main_cplex.cpp
 	g++ main_cplex.cpp -o grec_cplex ${CPPFLAGS} -lglpk ${CPLEX_FLAGS}
