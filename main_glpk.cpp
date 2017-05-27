@@ -709,6 +709,69 @@ void randomRemoveEdges( Graph& G_in,
    }
 }
 
+void randomRemoveEdges( tinyGraph& g,
+			unsigned mRemove,
+			double& graphUpdateTime,
+			double& dart2RemTime ) {
+
+   //Begin edge removal procedure
+   uniform_int_distribution<> vdist(0, g.n - 1);
+   unsigned numRemoved = 0;
+   graphUpdateTime = 0.0;
+   dart2RemTime = 0.0;
+   while (numRemoved < mRemove) {
+      node_id from;
+      do {
+	 from = vdist( gen );
+      } while (g.adjList[from].neis.size() == 0);
+
+      uniform_int_distribution<> neiDist(0, g.adjList[from].neis.size() - 1);
+      size_t toIndex = neiDist( gen );
+      vector< tinyEdge >::iterator e = g.adjList[ from ].neis.begin() + toIndex;
+
+      //remove edge
+      dartTime2 = 0.0;
+      updateTime2 = 0.0;
+      g.dart_remove_edge( from, e, dart2RemTime, graphUpdateTime );
+	 
+      ++numRemoved;
+   }
+}
+
+void randomRemoveEdges( Graph& G,
+			unsigned mRemove,
+			double& graphUpdateTime,
+			double& dart1RemTime ) {
+
+   //Begin edge removal procedure
+   uniform_int_distribution<> vdist(0, G.V.size() - 1);
+   unsigned numRemoved = 0;
+   graphUpdateTime = 0.0;
+   dart1RemTime = 0.0;
+   while (numRemoved < mRemove) {
+      node_id from;
+      do {
+	 from = vdist( gen );
+      } while (G.V[from].neighbors.size() == 0);
+
+      uniform_int_distribution<> neiDist(0, G.V[from].neighbors.size() - 1);
+      size_t toIndex = neiDist( gen );
+
+      Node& From = G.V[ from ];
+      auto f = From.neighbors.begin();
+      size_t tmpST = 0;
+      while (tmpST < toIndex) {
+	 ++tmpST;
+	 ++f;
+      }
+
+      //remove edge
+      G.dart_remove_edge( *f, dart1RemTime, graphUpdateTime );
+	 
+      ++numRemoved;
+   }
+}
+
 /*
  * Add random edges to tinygraph g and update the Dart2 solution
  * Returns the time to update the tinyGraph structure and the time
