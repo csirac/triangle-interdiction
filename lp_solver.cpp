@@ -133,8 +133,9 @@ bool solve_lp ( Graph& G,
  * Requires eid of each edge to be valid
  */
 unsigned solve_ip ( Graph& G,
-		vector< double >& v_sol,
-		unsigned nThreads = 18) {
+		    vector< double >& v_sol,
+		    double max_hours,
+		    unsigned nThreads = 18) {
    G.logg(INFO, "Beginning IP with maximum of " + to_string( nThreads ) + " threads...");
    
    //Triangles should already be generated
@@ -212,10 +213,12 @@ unsigned solve_ip ( Graph& G,
    G.logg(DEBUG, "Building cplex from model...");
    IloCplex cplex(model);
    cplex.setParam(IloCplex::IntParam::Threads, nThreads);
+   cplex.setParam(IloCplex::IntParam::ParallelMode, -1 ); //Opportunistic
    //   cplex.setParam(IloCplex::IntParam::Threads, 1);
-   cplex.setParam(IloCplex::ClockType, 1); //Tells cplex to use cpu time
+   //Tells cplex to use wall-clock time
+   cplex.setParam(IloCplex::ClockType, 2); 
    double hour = 60.0 * 60;
-   cplex.setParam(IloCplex::TiLim, 10 * hour );
+   cplex.setParam(IloCplex::TiLim, max_hours * hour );
    cplex.setOut(env.getNullStream());
    //   cplex.setParam(IloCplex::EpAGap, 1.0 / (2 * G.E.size()));
    G.logg(DEBUG, "Solving IP...");

@@ -205,7 +205,7 @@ int main(int argc, char ** argv) {
      vector< double > v_sol;
      bool status;
      clock_t t_start = clock();
-     status = solve_ip( G, v_sol, nThreads );
+     status = solve_ip( G, v_sol, max_hours, nThreads );
      double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
      unsigned size;
      if (status)
