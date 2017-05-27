@@ -1177,7 +1177,7 @@ namespace mygraph {
       free_prune();
       
       runningTime = double (clock() - t_start) / CLOCKS_PER_SEC;
-      logg(INFO, "DART_BASE finished, size of S: " + to_string(countS));
+      //      logg(INFO, "DART_BASE finished, size of S: " + to_string(countS));
 
       return countS;
     }

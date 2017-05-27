@@ -15,6 +15,16 @@ void randomRemoveEdges( Graph& G_in,
 			vector< Algo >& A,
 			ostream& os, unsigned checkpoint);
 
+void randomRemoveEdges( tinyGraph& g,
+			unsigned mRemove,
+			double& graphUpdateTime,
+			double& dart2RemTime );
+
+void randomRemoveEdges( Graph& G,
+			unsigned mRemove,
+			double& graphUpdateTime,
+			double& dart1RemTime );
+
 void randomAddEdges( Graph& G,
 		     unsigned mAdd, vector< Algo >& A, ostream& os, unsigned checkpoint);
 void randomAddEdges( Graph& G, unsigned mAdd, double& graphUpdateTime, double& dart1AddTime);
@@ -337,6 +347,42 @@ int main(int argc, char ** argv) {
 	//    }
 	// 
 	}
+
+	if (bRemove) {
+	   G.init_dynamic();
+	   G.logg(INFO, "Removing edges...");
+	   double GraphUpdateTime;
+	   double dart1RemTime;
+	   randomRemoveEdges( G, mRemove, GraphUpdateTime, dart1RemTime );
+	   G.countS();
+	   G.logg( INFO, "After removing " +to_string(mRemove) + " edges, " + to_string(G.sizeS) + " " + to_string( dart1RemTime) );
+
+	   G.logg(INFO, "Basic graph info (n, m): " + to_string( G.V.size() ) + " "  + to_string( G.E.size() ) );
+
+	   myResults.add( "GraphUpdateTime", GraphUpdateTime );
+	   myResults.add( "Dart1RemoveTime", dart1RemTime );
+	   myResults.add( "Dart1RemoveSize", G.sizeS );
+	   myResults.add( "NumberRemoved", mRemove );
+	   
+	//    G.logg(DEBUG, "Comprehensive feasibility check...");
+	//    G.T.clear();
+	//    G.init_static();
+	//    if( !G.verify_graph() ) {
+	//       G.logg(ERROR, "Graph structure is incorrect." );
+	//       exit(1);
+	//    } else {
+	//       G.logg(INFO, "Graph structure is correct." );
+	//    }
+
+	//    G.list_triangles();
+	//    G.logg(INFO, "Triangle-listing: " + to_string( G.T.size() ) );
+	//    if (G.ensure_feasibility()) {
+	//       G.logg(DEBUG, "Dart_add has maintained feasibility...");
+	//    }  else {
+	//       G.logg(ERROR, "Dart_add has violated feasibility.");
+	//    }
+	// 
+	}
 	
 	G.clear_edges();
      }
@@ -379,6 +425,22 @@ int main(int argc, char ** argv) {
 	   myResults.add( "Dart2AddTime", dart2AddTime );
 	   myResults.add( "Dart2AddSize", size );
 	   myResults.add( "NumberAdded", mAdd );
+	}
+
+	if (bRemove) {
+	   G.logg(INFO, "Removing edges...");
+	   double tinyGraphUpdateTime;
+	   double dart2RemoveTime;
+	   randomRemoveEdges( g, mRemove, tinyGraphUpdateTime, dart2RemoveTime );
+	   size = g.countS();
+	   G.logg( INFO, "After removing " + to_string(mRemove) + " edges, " + to_string(size) + " " + to_string(dart2RemoveTime) );
+
+	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
+
+	   myResults.add( "tinyGraphUpdateTime", tinyGraphUpdateTime );
+	   myResults.add( "Dart2RemoveTime", dart2RemoveTime );
+	   myResults.add( "Dart2RemoveSize", size );
+	   myResults.add( "NumberRemoved", mRemove );
 	}
 
 	if (bAddRemove) {

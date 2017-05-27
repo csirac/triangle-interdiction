@@ -149,7 +149,7 @@ int main(int argc, char ** argv) {
   if (bTarl) {
      of << "# TARL" << endl;
      clock_t t_start = clock();
-     unsigned size = tarl( G, nThreads );
+     unsigned size = tarl( G, nThreads, max_hours );
      double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
      of << size << ' ' << t_elapsed << ' ' << G.ensure_feasibility() << endl;
      if (G.ensure_feasibility())
@@ -164,7 +164,7 @@ int main(int argc, char ** argv) {
      of << "# Kortsarz" << endl;
      G.info_check( of );
      clock_t t_start = clock();
-     kortsarz( G, nThreads );
+     kortsarz( G, nThreads, max_hours );
      double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
      unsigned size = G.countS();
      of << size << ' ' << t_elapsed << ' ' << G.ensure_feasibility() << endl;
@@ -176,26 +176,6 @@ int main(int argc, char ** argv) {
 	  
      G.clear_edges();
 
-     {
-	of << "# Kortsarz (GLPK)" << endl;
-	G.info_check( of );
-	clock_t t_start = clock();
-	if ( glpk_kortsarz( G, max_hours ) ) {
-	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
-	   unsigned size = G.countS();
-	   of << size << ' ' << t_elapsed << ' ' << G.ensure_feasibility() << endl;
-
-	   if (G.ensure_feasibility())
-	      G.logg(INFO, "Kortsarz (GLPK) solution is feasible.");
-	   else
-	      G.logg(WARN, "Kortsarz (GLPK) solution is infeasible!");
-	  
-	   G.clear_edges();
-	} else {
-	   G.logg(WARN, "Kortsarz (GLPK) exceeded time limit!");
-	   of << "Exceeded time limit." << endl;
-	}
-     }
   }
 
   if (bOpt) {

@@ -22,7 +22,8 @@ bool triangle_valid( pangle& t ) {
  */
 bool solve_lp ( Graph& G,
 		vector< double >& v_sol,
-		unsigned nThreads = 18) {
+		unsigned nThreads = 18,
+		double max_hours = 4.0) {
    G.logg(DEBUG, "Beginning LP...");
    
    //Triangles should already be generated
@@ -101,9 +102,9 @@ bool solve_lp ( Graph& G,
    G.logg(DEBUG, "Building cplex from model...");
    IloCplex cplex(model);
    cplex.setParam(IloCplex::IntParam::Threads, nThreads);
-   cplex.setParam(IloCplex::ClockType, 1); //Tells cplex to use cpu time
+   cplex.setParam(IloCplex::ClockType, 2); //Tells cplex to use wall-clock time
    double hour = 60.0 * 60;
-   cplex.setParam(IloCplex::TiLim, 10 * hour );
+   cplex.setParam(IloCplex::TiLim, max_hours * hour );
    cplex.setOut(env.getNullStream());
    G.logg(DEBUG, "Solving LP...");
    cplex.solve();
@@ -382,7 +383,7 @@ bool is_triangle_redundant( pedge& e ) {
  * 2-approximation
  *
  */
-unsigned kortsarz( Graph& G, unsigned nThreads = 18 ) {
+unsigned kortsarz( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
    G.logg(INFO, "Starting Kortsarz et al....");
    vector< double > lpsol;
 
@@ -390,7 +391,7 @@ unsigned kortsarz( Graph& G, unsigned nThreads = 18 ) {
    unsigned eid;
    unsigned sizeS = 0;
    do {
-      bool status = solve_lp( G, lpsol, nThreads );
+      bool status = solve_lp( G, lpsol, nThreads, max_hours );
       if (status == false)
 	 return 0;
       
@@ -462,9 +463,9 @@ unsigned kortsarz( Graph& G, unsigned nThreads = 18 ) {
 /*
  * TARL algorithm
  */
-unsigned tarl( Graph& G, unsigned nThreads = 18 ) {
+unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
    vector< double > lpsol;
-   bool status = solve_lp( G, lpsol, nThreads );
+   bool status = solve_lp( G, lpsol, nThreads, max_hours );
    if (status == false)
       return 0;
    
