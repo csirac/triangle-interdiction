@@ -22,12 +22,15 @@ bool triangle_valid( pangle& t ) {
  */
 bool solve_lp ( Graph& G,
 		vector< double >& v_sol,
+		IloEnv& env,
+		IloCplex& cplex,
+		//		IloModel& model,
 		unsigned nThreads = 18,
 		double max_hours = 4.0) {
-   G.logg(DEBUG, "Beginning LP...");
+   G.logg(INFO, "Beginning LP...");
    
    //Triangles should already be generated
-   IloEnv env;
+   //   IloEnv env;
    IloModel model(env);
    IloNumVarArray var(env);
    IloRangeArray con(env);
@@ -100,7 +103,8 @@ bool solve_lp ( Graph& G,
    model.add(c);
 
    G.logg(DEBUG, "Building cplex from model...");
-   IloCplex cplex(model);
+   //   IloCplex cplex(model);
+   cplex.extract(model);
    cplex.setParam(IloCplex::IntParam::Threads, nThreads);
    cplex.setParam(IloCplex::ClockType, 2); //Tells cplex to use wall-clock time
    double hour = 60.0 * 60;
@@ -120,12 +124,19 @@ bool solve_lp ( Graph& G,
       ++eid;
    }
 
-   G.logg(DEBUG, "Solution finished, objective value: " + to_string(cplex.getObjValue()));
+   G.logg(INFO, "Solution finished, objective value: " + to_string(cplex.getObjValue()));
    if (cplex.getCplexStatus() == IloCplex::Optimal)
       return true;
    else
       return false;
 
+   //   cplex.clearModel();
+   cplex.end();
+   obj.end();
+   c.end();
+   var.end();
+   con.end();
+   model.end();
    env.end();
 }
 
@@ -392,8 +403,10 @@ unsigned kortsarz( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
    bool b_solve;
    unsigned eid;
    unsigned sizeS = 0;
+   IloEnv env;
+   IloCplex cplex( env );
    do {
-      bool status = solve_lp( G, lpsol, nThreads, max_hours );
+      bool status = solve_lp( G, lpsol, env, cplex, nThreads, max_hours );
       if (status == false)
 	 return 0;
       
@@ -467,7 +480,10 @@ unsigned kortsarz( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
  */
 unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
    vector< double > lpsol;
-   bool status = solve_lp( G, lpsol, nThreads, max_hours );
+   IloEnv env;
+   IloCplex cplex( env );
+
+   bool status = solve_lp( G, lpsol, env, cplex, nThreads, max_hours );
    if (status == false)
       return 0;
    
