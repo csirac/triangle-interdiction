@@ -319,6 +319,69 @@ namespace mygraph {
        m = 0;
     }
 
+    /*
+     * Writes graph as graphml
+     * Edges in S are red
+     * Edges in W are blue (if show_pruned)
+     */
+    void write_graphml( ofstream& of, bool show_pruned = false ) {
+      //header info
+      of << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+      of << "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n";
+
+      //the color attribute
+      of << "<key id=\"d0\" for=\"edge\" attr.name=\"color\" attr.type=\"string\">\n"
+	 << "<default>gray</default>\n"
+	 << "</key>\n";
+      //the size attribute
+      of << "<key attr.name=\"size\" attr.type=\"float\" for=\"node\" id=\"size\"/>";
+      //edge weight attribute
+      of << "<key attr.name=\"weight\" attr.type=\"double\" for=\"edge\" id=\"weight\"/>\n";
+      //Start writing graph
+      of << "<graph id=\"G\" edgedefault=\"undirected\">\n";
+      //nodes
+      unsigned n = V.size();
+      double nsize;
+      for (unsigned i = 0; i < n; ++i) {
+	string nid = to_string( i );
+	of << "<node id=\"" << nid << "\">\n";
+	//give this node a fixed, large size
+	nsize = 15.0;
+	of << "<data key=\"size\">" << nsize << "</data>\n";
+	of << "</node>\n";
+      }
+ 
+
+      //edges
+      unsigned from;
+      unsigned to;
+      unsigned eid = 0;
+      for (auto it = E.begin(); it != E.end(); ++it ) {
+	from = it->from;
+	to = it-> to;
+	string seid = to_string( eid );
+	seid = "e" + seid;
+	of << "<edge id=\"" << seid << "\" source=\"" << to_string( from ) << "\" target=\"" << to_string( to ) << "\">\n";
+	//write the edge weight
+	of << "<data key=\"weight\">" << 1.0 << "</data>\n";
+	if (it->in_S) {
+	  //make these edges red
+	  of << "<data key=\"d0\">red</data>\n";
+	}
+	if (show_pruned) {
+	  if (it->in_W) {
+	    //make these edges blue
+	    of << "<data key=\"d0\">blue</data>\n";
+	  }
+	}
+	of << "</edge>\n";
+      }
+      
+      //finish up
+      of << "</graph>\n</graphml>\n";
+    }
+
+    
     //     Graph( const Graph& in ) : logg( in.logg.loglevel, in.logg.of ) {
 	
     //     }

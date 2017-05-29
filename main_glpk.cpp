@@ -108,9 +108,15 @@ int main(int argc, char ** argv) {
   double erP;
   bool bDynCompare = false;
   unsigned checkpoint = 1;
+  bool bVisualize = false;
+  string VisFname = "";
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC:") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC:V:") ) != -1) {
     switch(c) {
+    case 'V':
+      bVisualize = true;
+      VisFname.assign( optarg );
+      break;
     case 'C':
        bDynCompare = true;
        s_arg.assign( optarg );
@@ -297,14 +303,16 @@ int main(int argc, char ** argv) {
      }
 
      if (bPD) {
+       G.clear_edges();
 	G.primal_dual();
 	myResults.add( "PrimalDualSize", G.sizeS );
 	myResults.add( "PrimalDualTime", G.runningTime );
 	myResults.add( "PrimalDualMem" , getPeakRSS() / (1024.0 * 1024.0));
-	G.clear_edges();
      }
      
      if (bDart) {
+       	G.clear_edges();
+
 	G.logg( INFO, "Starting dart-base (first implementation)..." );
 	G.dart_base();
 	G.countS();
@@ -387,12 +395,12 @@ int main(int argc, char ** argv) {
 	// 
 	}
 	
-	G.clear_edges();
      }
   
 
      if (bDart2) {
 	G.logg( INFO, "Reading graph into tinyGraph structure..." );
+	G.clear_edges();
 	tinyGraph g;
 	if (bBinaryFormat) {
 	   g.read_edge_list_bin( fname );
@@ -455,11 +463,12 @@ int main(int argc, char ** argv) {
 	   G.logg(INFO, "Basic graph info (n, m): " + to_string( g.n ) + " "  + to_string( g.m ) );
 	}
 
-	G.clear_edges();
      }
 
      if (bTarl) {
 	G.logg( INFO, "Starting TARL..." );
+	G.clear_edges();
+
 	clock_t t_start = clock();
 	if (glpk_tarl( G, max_hours )) {
 	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
@@ -480,11 +489,12 @@ int main(int argc, char ** argv) {
 	   myResults.set( "TarlTime", 0 );
 	   return 1;
 	}
-	G.clear_edges();
+
      }
 
      if (bKortsarz) {
 	G.logg( INFO, "Starting Kortsarz..." );
+	G.clear_edges();
 	clock_t t_start = clock();
 	if (glpk_kortsarz( G, max_hours ) ) {
 	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
@@ -506,11 +516,11 @@ int main(int argc, char ** argv) {
 	   return 1;
 	}
      
-	G.clear_edges();
      }
 
      if (bOpt) {
 	G.logg(INFO, "Starting GLPK IP solver..." );
+	G.clear_edges();
 	clock_t t_start = clock();
 	GLPK_solver GLPK( G, max_hours );
 	vector< unsigned > vout;
@@ -532,7 +542,7 @@ int main(int argc, char ** argv) {
 	   return 1;
 	}
 
-	G.clear_edges();
+
      }
 
      if (bOut) {
@@ -541,11 +551,17 @@ int main(int argc, char ** argv) {
        myResults.print_xml( ofile );
        ofile.close();
      }
+
+     if (bVisualize) {
+       ofstream ofile;
+       ofile.open( VisFname.c_str() );
+       G.write_graphml( ofile );
+     }
      //     myResults.print_xml( cout );
   }
 
 
-
+  
   
   return 0;
 }
