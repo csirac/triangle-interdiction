@@ -679,7 +679,66 @@ namespace mygraph {
 
       T.push_front(T_out);
     }
-      
+
+    size_t count_triangles() {
+             clock_t t_start = clock();
+      vector < vector< node_id > > A( n, vector< node_id >() );
+      vector < vector< size_t > > I( n, vector< size_t >() ); //Indices of edges
+      size_t count = 0;
+	 
+      for (node_id s = 0; s < n; ++s ) {
+	for (size_t j = 0; j < V[s].v_nei_ids.size(); ++j) {
+	  node_id& t = V[s].v_nei_ids[ j ];
+	  if (s < t) {
+	    vector< node_id >& A_s = A[s];
+	    vector< node_id >& A_t = A[t];
+	    vector< size_t >& I_s = I[s];
+	    vector< size_t >& I_t = I[t];
+	    auto it1 = A_s.begin();
+	    auto it2 = A_t.begin();
+	    if (it1 == A_s.end() || it2 == A_t.end() ) {
+	      A_t.push_back( s );
+	      I_t.push_back( j );
+	      continue;
+	    }
+	    auto it3 = I_s.begin();
+	    auto it4 = I_t.begin();
+	    while (1) {
+	      if (*it1 < *it2) {
+		++it1;
+		++it3;
+		if (it1 == A_s.end()) {
+		  break;
+		}
+	      } else {
+		if (*it2 < *it1) {
+		  ++it2;
+		  ++it4;
+		  if (it2 == A_t.end()) {
+		    break;
+		  }
+		} else {
+		  //found a triangle
+		  //add_triangle( *it1, *it3, *it4, j, s, t);
+		  ++count;
+		  ++it1; ++it3;
+		  ++it2; ++it4;
+		  if (it1 == A_s.end() || it2 == A_t.end() )
+		    break;
+		}
+	      }
+	    }
+	    A_t.push_back( s );
+	    I_t.push_back( j );
+	  }
+	}
+      }
+      tTriangles = double (clock() - t_start) / CLOCKS_PER_SEC;
+      logg( INFO, to_string(count) + " triangles found.");
+
+      return count;
+    }
+    
     void list_triangles() {
        clock_t t_start = clock();
       vector < vector< node_id > > A( n, vector< node_id >() );
@@ -1027,12 +1086,14 @@ namespace mygraph {
       if (V[from].incident( to ) ) {
 	return false;
       }
+
       //Add edge to graph
       Edge ee( from, to );
       E.push_front( ee );
       e_added = E.begin();
       V[from].insert_sort( e_added, from );
       V[to].insert_sort( e_added, to );
+
       return true;   
     }
       

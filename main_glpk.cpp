@@ -63,6 +63,7 @@ void print_help() {
        << "-K [run 2-approx. of Kortsarz et al.]" << endl
        << "-O [run optimal solution via GNU GLPK]" << endl
        << "-P [run primal-dual algorithm]" << endl
+       << "-p [Preprocess graph and count triangles only]" << endl
        << "-A <m_add> (run DART, then adaptively add <m_add> random edges to the network)" << endl
        << "-R <m_remove> (run DART, then adaptively remove <m_remove> random edges from the network)" << endl
        << "-S <m_addremove> (run DART, then adaptively add <m_addremove> random edges to the network, and then remove the same edges)" << endl
@@ -110,9 +111,13 @@ int main(int argc, char ** argv) {
   unsigned checkpoint = 1;
   bool bVisualize = false;
   string VisFname = "";
+  bool bPreprocessOnly = false;
   
-  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC:V:") ) != -1) {
+  while ((c = getopt( argc, argv, ":G:OKTDEt:x:A:R:S:g:o:N:PC:V:p") ) != -1) {
     switch(c) {
+    case 'p':
+      bPreprocessOnly = true;
+      break;
     case 'V':
       bVisualize = true;
       VisFname.assign( optarg );
@@ -215,7 +220,7 @@ int main(int argc, char ** argv) {
      G.clear_graph();
      myResults.data.clear();
      
-     if (bKortsarz || bOpt || bTarl || bDart || bPD) {
+     if (bKortsarz || bOpt || bTarl || bDart || bPD || bPreprocessOnly ) {
 	G.logg(INFO, "Reading graph...");
 	if (bBinaryFormat) {
 	   G.read_edge_list_bin( fname );
@@ -234,6 +239,13 @@ int main(int argc, char ** argv) {
 	myResults.add( "GraphEdges", G.E.size() );
 	myResults.add( "GraphPreprocess", G.preprocessTime );
 	myResults.add( "GraphName", fname );
+
+	if (bPreprocessOnly) {
+	  size_t nTriangles = G.count_triangles();
+	  myResults.add( "NumberTriangles", nTriangles );
+	  iter = Nreps;
+	  bKortsarz = bOpt = bTarl = bDart = bPD = bDart2 = false;
+	}
      }
 
      if (bDynCompare) {
@@ -324,7 +336,7 @@ int main(int argc, char ** argv) {
 	myResults.add( "Dart1Mem" , getPeakRSS() / (1024.0 * 1024.0));
      
 	if (bAdd) {
-	   G.init_dynamic();
+	   G.init_dynamic(true);
 	   G.logg(INFO, "Adding edges...");
 	   double GraphUpdateTime;
 	   double dart1AddTime;
@@ -360,7 +372,7 @@ int main(int argc, char ** argv) {
 	}
 
 	if (bRemove) {
-	   G.init_dynamic();
+	   G.init_dynamic(true);
 	   G.logg(INFO, "Removing edges...");
 	   double GraphUpdateTime;
 	   double dart1RemTime;
@@ -932,6 +944,7 @@ void randomAddEdges( Graph& G, unsigned mAdd, double& graphUpdateTime, double& d
       node_id from = vdist( gen );
       node_id to = vdist( gen );
       pedge e;
+
       t_start = clock();
       if ( G.dynamic_add_edge( from, to, e ) ) {
 	 graphUpdateTime += double (clock() - t_start) / CLOCKS_PER_SEC;
