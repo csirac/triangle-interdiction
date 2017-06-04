@@ -482,7 +482,7 @@ int main(int argc, char ** argv) {
 	G.clear_edges();
 
 	clock_t t_start = clock();
-	if (glpk_tarl( G, max_hours )) {
+	if (glpk_tarl2( G, max_hours )) {
 	   double t_elapsed = double (clock() - t_start) / CLOCKS_PER_SEC;
 	   unsigned size = G.countS();
 	   G.logg( INFO, "TARL: " + to_string(size) + " " + to_string(t_elapsed) + " " + to_string(G.ensure_feasibility() ));

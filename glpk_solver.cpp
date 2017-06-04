@@ -368,5 +368,70 @@ bool glpk_tarl( Graph& G, double max_hours = 4.0 ) {
    return true; //R.size() + sizeS;
 }
 
+bool glpk_tarl2( Graph& G, double max_hours = 4.0 ) {
+   vector< double > lpsol( G.E.size(), 0.0 );
+
+   GLPK_solver KSolver( G, max_hours );
+   bool status = KSolver.LP_solve( lpsol );
+   if (status == false)
+      return false;
+   
+   unsigned eid = 0;
+   vector< pedge > W;
+   unsigned nWprime = 0;
+   unsigned nedges_added = 0;
+   for (pedge e = G.E.begin();
+	e != G.E.end();
+	++e ) {
+      if ( lpsol[eid] < 1.0 / 5 ) {
+	 e-> in_W = true;
+	 W.push_back( e );
+	    
+	 if ( !(e-> in_S) ) {
+	    ++nWprime;
+	    //ADD other edges of triangles containing e
+	    
+	    for ( auto it = e->Delta.begin(); it != e->Delta.end(); ++it ) {
+	       if (G.triangle_valid(*it)) {
+		  nedges_added = 0;
+
+		  pedge eToAdd;
+		  //put in edge from this triangle with max weight
+		  pangle& T = *it;
+		  if ( lpsol[ T->e1->eid ] > lpsol[ T->e2->eid ] )
+		     eToAdd = T->e1;
+		  else
+		     eToAdd = T->e2;
+
+		  if ( lpsol[ T->e3->eid ] > lpsol[ eToAdd->eid ] )
+		     eToAdd = T->e3;
+
+		  eToAdd->in_S = true;
+		  ++nedges_added;
+
+	       }
+	    }
+	 }
+      }
+     
+      ++eid;
+   }
+   G.logg(DEBUG, "size of W: " + to_string(W.size()));
+   G.logg(DEBUG, "size of Wprime: " + to_string(nWprime));
+
+   G.logg(DEBUG, "Starting bipartite (complement)...");
+   vector< pedge > R;
+   G.bipartite_complement( R );
+   G.logg(DEBUG, "Size of R:" + to_string(R.size()));
+
+   for (auto i = R.begin();
+	i != R.end();
+	++i) {
+      (*i)->in_S = true;
+   }
+   
+   return true; //R.size() + sizeS;
+}
+
 
 #endif   

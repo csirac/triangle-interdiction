@@ -489,10 +489,7 @@ unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
    
    unsigned eid = 0;
    vector< pedge > W;
-   unsigned nWprime = 0;
-   unsigned nedges_added = 0;
-   double weight = 0.0;
-   double sWeight = 0.0;
+
    for (pedge e = G.E.begin();
 	e != G.E.end();
 	++e ) {
@@ -502,41 +499,23 @@ unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
 	 //	 lpsol[eid] = 0.0;
 	    
 	 if ( !(e-> in_S) ) {
-	    ++nWprime;
+
 	    //ADD other edges of triangles containing e
 	    
 	    for ( auto it = e->Delta.begin(); it != e->Delta.end(); ++it ) {
 	       if (triangle_valid(*it)) {
-		  nedges_added = 0;
-		  weight = 0.0;
-		  if ((*it)->e1 != e) {
-		     (*it)->e1->in_S = true;
-		     //		  lpsol[ (*it)->e1->eid ] = 1.0;
-		     ++nedges_added;
-		     weight +=  lpsol[ (*it)->e1->eid ];
+		  pedge eToAdd;
+		  //put in edge from this triangle with max weight
+		  pangle& T = *it;
+		  if ( lpsol[ T->e1->eid ] > lpsol[ T->e2->eid ] )
+		     eToAdd = T->e1;
+		  else
+		     eToAdd = T->e2;
 
-		  }
-		  if ((*it)->e2 != e) {
-		     (*it)->e2->in_S = true;
-		     //		  lpsol[ (*it)->e2->eid ] = 1.0;
-		     ++nedges_added;
-		     weight +=  lpsol[ (*it)->e2->eid ];
+		  if ( lpsol[ T->e3->eid ] > lpsol[ eToAdd->eid ] )
+		     eToAdd = T->e3;
 
-		  }
-		  if ((*it)->e3 != e) {
-		     (*it)->e3->in_S = true;
-		     //		  lpsol[ (*it)->e3->eid ] = 1.0;
-		     ++nedges_added;
-		     weight +=  lpsol[ (*it)->e3->eid ];
-
-		  }
-		  
-		  if (nedges_added > 2)
-		     G.logg(DEBUG, "More than 2 edges added from triangle...");
-		  if (weight < 4.0 / 5)
-		     G.logg(DEBUG, "Weight added is too low...");
-
-		  sWeight += weight;
+		  eToAdd->in_S = true;
 	       }
 	    }
 	 }
@@ -544,44 +523,11 @@ unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
      
       ++eid;
    }
-   G.logg(DEBUG, "sWeight: " + to_string(sWeight));
-   G.logg(DEBUG, "size of W: " + to_string(W.size()));
-   G.logg(DEBUG, "size of Wprime: " + to_string(nWprime));
-   //   for (auto i = W.begin();
-   //   	i != W.end();
-   //   	++i) {
-   //         (*i)->in_S = false;
-   //   }
-
-   // G.logg(DEBUG, "Removing S...");
-
-   unsigned sizeS = 0;
-   double weightS = 0.0;
-   auto i = G.E.begin();
-   while ( i != G.E.end() ) {
-      if ( i->in_S ) {
-	 //	 i = G.remove_edge( i );
-	 ++sizeS;
-	 weightS += lpsol[ i->eid ];
-      }
-      ++i;
-   }
-   //   else {
-   //     ++i;
-   //   }
-   // }
-   G.logg(DEBUG, "Size of S: " + to_string( sizeS ) );
-   G.logg(DEBUG, "Weight of S: " + to_string( weightS ) );
-   // G.logg(DEBUG, "Removing W...");
-   // for (auto i = W.begin(); i != W.end(); ++i) {
-   //   G.remove_edge( *i );
-   // }
 
    G.logg(DEBUG, "Starting bipartite (complement)...");
    vector< pedge > R;
    G.bipartite_complement( R );
    G.logg(DEBUG, "Size of R:" + to_string(R.size()));
-   //   G.logg(DEBUG, "Edges in G': " + to_string(G.E.size()));
 
    for (auto i = R.begin();
 	i != R.end();
@@ -589,20 +535,7 @@ unsigned tarl( Graph& G, unsigned nThreads = 18, double max_hours = 4.0 ) {
       (*i)->in_S = true;
    }
    
-   // for (auto i = G.V.begin();
-   // 	i != G.V.end();
-   // 	++i) {
-   //    i->in_A = false;
-   //    i->in_C = false;
-   // }
-
-   // G.logg(DEBUG, "Starting bipartite...");
-   // vector< pedge > B;
-   // G.bipartite( B );
-   // G.logg(DEBUG, "Size of G':" + to_string(B.size() + R.size()));
-
-   G.logg(INFO, "Solution size:" + to_string(R.size() + sizeS));
-   return R.size() + sizeS;
+   return G.countS();
 }
 
 
