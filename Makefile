@@ -1,6 +1,6 @@
 CPPFLAGS=-std=c++11 -Wall -O3
-CPLEX_INCLUDE=-I/opt/ibm/ILOG/CPLEX_Studio1263/cplex/include -I/opt/ibm/ILOG/CPLEX_Studio1263/concert/include
-CPLEX_LIB=-L/opt/ibm/ILOG/CPLEX_Studio1263/cplex/lib/x86-64_linux/static_pic -L/opt/ibm/ILOG/CPLEX_Studio1263/concert/lib/x86-64_linux/static_pic -lilocplex -lcplex -lconcert -lm -lpthread
+CPLEX_INCLUDE=-I/opt/ibm/ILOG/CPLEX_Studio1271/cplex/include -I/opt/ibm/ILOG/CPLEX_Studio1271/concert/include
+CPLEX_LIB=-L/opt/ibm/ILOG/CPLEX_Studio1271/cplex/lib/x86-64_linux/static_pic -L/opt/ibm/ILOG/CPLEX_Studio1271/concert/lib/x86-64_linux/static_pic -lilocplex -lcplex -lconcert -lm -lpthread
 CPLEX_FLAGS=${CPLEX_INCLUDE} ${CPLEX_LIB} -DNDEBUG -DILOSTRICTPOD -DIL_STD
 
 all: main_glpk.cpp
